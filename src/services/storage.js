@@ -1,4 +1,5 @@
 const STORAGE_KEY = 'gympilot-state-v4'
+const USER_KEY = 'gympilot-current-user-v1'
 const LEGACY_KEYS = ['gympilot-state-v3', 'gympilot-state-v2']
 
 const defaultState = {
@@ -7,6 +8,14 @@ const defaultState = {
     goals: [],
     notes: '',
     feedback: '',
+    name: '',
+    gender: '',
+    age: '',
+    height: '',
+    weight: '',
+    trainingLevel: '恢复适应',
+    weeklyTarget: '每周 3 次',
+    preferredTime: '晚上',
   },
   selectedDates: [],
   plans: [],
@@ -18,9 +27,11 @@ const defaultState = {
   },
 }
 
-export function loadState() {
+export function loadState(userEmail = getCurrentUser()?.email) {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY) || LEGACY_KEYS.map((key) => localStorage.getItem(key)).find(Boolean)
+    const userState = userEmail ? localStorage.getItem(stateKeyForUser(userEmail)) : null
+    const legacyState = userEmail ? null : localStorage.getItem(STORAGE_KEY) || LEGACY_KEYS.map((key) => localStorage.getItem(key)).find(Boolean)
+    const raw = userState || legacyState
     if (!raw) return defaultState
     const parsed = JSON.parse(raw)
     const selectedDates = parsed.selectedDates || []
@@ -44,13 +55,35 @@ export function loadState() {
   }
 }
 
-export function saveState(state) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+export function saveState(state, userEmail = getCurrentUser()?.email) {
+  localStorage.setItem(stateKeyForUser(userEmail), JSON.stringify(state))
 }
 
 export function resetState() {
-  localStorage.removeItem(STORAGE_KEY)
+  localStorage.removeItem(stateKeyForUser(getCurrentUser()?.email))
   return defaultState
+}
+
+export function getCurrentUser() {
+  try {
+    const raw = localStorage.getItem(USER_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
+
+export function setCurrentUser(user) {
+  localStorage.setItem(USER_KEY, JSON.stringify(user))
+}
+
+export function clearCurrentUser() {
+  localStorage.removeItem(USER_KEY)
+}
+
+export function userDisplayName(user) {
+  if (!user?.email) return '未登录'
+  return user.email.split('@')[0]
 }
 
 export function createId(prefix) {
@@ -80,6 +113,11 @@ function normalizePlanDates(plans, selectedDates) {
       dayLabel: formatDateLabel(date),
     }
   })
+}
+
+function stateKeyForUser(email) {
+  if (!email) return STORAGE_KEY
+  return `gympilot-state-user-${encodeURIComponent(email.toLowerCase())}-v1`
 }
 
 function formatDateLabel(dateValue) {

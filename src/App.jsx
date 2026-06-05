@@ -7,11 +7,14 @@ import {
   ChevronLeft,
   ChevronRight,
   Dumbbell,
+  LogOut,
+  Mail,
   Flame,
   HeartPulse,
   Home,
   Library,
   NotebookPen,
+  ShieldCheck,
   Pause,
   Play,
   Plus,
@@ -25,8 +28,9 @@ import {
 } from 'lucide-react'
 import { exerciseLibrary } from './data/exercises'
 import { connectAppleWatch, readLatestWorkoutMetrics } from './services/appleWatch'
+import { requestEmailCode, verifyEmailCode } from './services/auth'
 import { analyzeGoal, createPlansFromGoal } from './services/goalEngine'
-import { createId, loadState, saveState } from './services/storage'
+import { clearCurrentUser, createId, getCurrentUser, loadState, saveState, setCurrentUser, userDisplayName } from './services/storage'
 import './App.css'
 
 const navItems = [
@@ -34,14 +38,15 @@ const navItems = [
   { id: 'plan', label: '计划', icon: CalendarDays },
   { id: 'custom', label: '自定义', icon: Library },
   { id: 'diary', label: '日记', icon: NotebookPen },
-  { id: 'settings', label: '目标', icon: Settings },
+  { id: 'settings', label: '我的', icon: Settings },
 ]
 
-function initialState() {
-  const loaded = loadState()
+function initialState(user = getCurrentUser()) {
+  const loaded = loadState(user?.email)
   return {
     ...loaded,
     profile: {
+      ...loaded.profile,
       goalText: loaded.profile.goalText || '',
       goals: loaded.profile.goals || [],
       feedback: loaded.profile.feedback || '',
@@ -55,6 +60,7 @@ function initialState() {
 }
 
 function App() {
+  const [user, setUser] = useState(() => getCurrentUser())
   const [state, setState] = useState(initialState)
   const [activeTab, setActiveTab] = useState('plan')
   const [goalDraft, setGoalDraft] = useState(state.profile.goalText)
@@ -72,8 +78,8 @@ function App() {
   const [customDraft, setCustomDraft] = useState({ exercises: [] })
 
   useEffect(() => {
-    saveState(state)
-  }, [state])
+    if (user) saveState(state, user.email)
+  }, [state, user])
 
   useEffect(() => {
     if (!runner || runner.paused) return undefined
@@ -346,12 +352,41 @@ function App() {
     }))
   }
 
+  function handleLogin(nextUser) {
+    const signedUser = {
+      email: nextUser.email,
+      signedInAt: nextUser.signedInAt || new Date().toISOString(),
+    }
+    const nextState = initialState(signedUser)
+    setCurrentUser(signedUser)
+    setUser(signedUser)
+    setState(nextState)
+    setGoalDraft(nextState.profile.goalText || '')
+    setSelectedPlanId(null)
+    setRunner(null)
+    setActiveTab('plan')
+  }
+
+  function handleLogout() {
+    clearCurrentUser()
+    setUser(null)
+    setState(initialState(null))
+    setGoalDraft('')
+    setSelectedPlanId(null)
+    setRunner(null)
+    setActiveTab('plan')
+  }
+
+  if (!user) {
+    return <LoginView onLogin={handleLogin} />
+  }
+
   return (
     <main className="app">
       <header className="topbar">
         <div>
           <strong>GymPilot</strong>
-          <span>健身计划与训练追踪</span>
+          <span>{user.email} · 健身计划与训练追踪</span>
         </div>
         <button className={state.watch.connected ? 'watch-pill connected' : 'watch-pill'} onClick={syncWatch} type="button">
           <Watch size={17} />
@@ -423,7 +458,16 @@ function App() {
       )}
 
       {activeTab === 'settings' && (
-        <SettingsView watch={state.watch} onSyncWatch={syncWatch} />
+        <ProfileView
+          diary={state.diary}
+          onLogout={handleLogout}
+          onProfileChange={(profile) => updateState((current) => ({ ...current, profile: { ...current.profile, ...profile } }))}
+          onSyncWatch={syncWatch}
+          plans={state.plans}
+          profile={state.profile}
+          user={user}
+          watch={state.watch}
+        />
       )}
 
       {showSaveDialog && (
@@ -806,9 +850,149 @@ function DiaryView({ diary, filterMonth, stats, onDelete, onFilterMonth, onMood 
   )
 }
 
-function SettingsView({ watch, onSyncWatch }) {
+function LoginView({ onLogin }) {
+  const [email, setEmail] = useState('')
+  const [code, setCode] = useState('')
+  const [message, setMessage] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [codeSent, setCodeSent] = useState(false)
+
+  async function sendCode() {
+    setBusy(true)
+    setMessage('')
+    try {
+      const result = await requestEmailCode(email)
+      setCodeSent(true)
+      setMessage(result.message)
+    } catch (error) {
+      setMessage(error.message || '验证码发送失败')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function verifyCode() {
+    setBusy(true)
+    setMessage('')
+    try {
+      const user = await verifyEmailCode(email, code)
+      onLogin(user)
+    } catch (error) {
+      setMessage(error.message || '登录失败')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <main className="login-screen">
+      <section className="login-card">
+        <div className="login-brand">
+          <Dumbbell size={34} />
+          <div>
+            <strong>GymPilot</strong>
+            <span>用邮箱登录，保留你的个人训练记录</span>
+          </div>
+        </div>
+        <div className="login-form">
+          <label>
+            邮箱
+            <input autoComplete="email" inputMode="email" onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" type="email" value={email} />
+          </label>
+          {codeSent && (
+            <label>
+              验证码
+              <input inputMode="numeric" maxLength={6} onChange={(event) => setCode(event.target.value)} placeholder="6 位数字" value={code} />
+            </label>
+          )}
+          <div className="login-actions">
+            <button className="primary-button" disabled={busy} onClick={sendCode} type="button"><Mail size={18} /> {codeSent ? '重新获取' : '发送验证码'}</button>
+            <button className="start-button" disabled={!codeSent || busy} onClick={verifyCode} type="button"><ShieldCheck size={18} /> 登录</button>
+          </div>
+          {message && <p className="login-message">{message}</p>}
+        </div>
+        <div className="login-note">
+          <strong>数据隔离</strong>
+          <span>每个邮箱会使用独立的本地训练档案。当前 GitHub Pages 部署会先使用演示验证码；接入邮件后端后可真实发送到邮箱。</span>
+        </div>
+      </section>
+    </main>
+  )
+}
+
+function ProfileView({ diary, onLogout, onProfileChange, onSyncWatch, plans, profile, user, watch }) {
+  const stats = useMemo(() => ({
+    sessions: diary.length,
+    minutes: diary.reduce((sum, item) => sum + Number(item.duration || 0), 0),
+    calories: diary.reduce((sum, item) => sum + Number(item.calories || 0), 0),
+    completed: diary.reduce((sum, item) => sum + Number(item.completedExercises?.length || 0), 0),
+  }), [diary])
+  const latestDiary = diary.slice(0, 3)
+  const nextPlan = [...plans].sort((a, b) => new Date(a.date || a.dateKey) - new Date(b.date || b.dateKey))
+    .find((plan) => new Date(`${plan.date || plan.dateKey}T23:59:59`) >= new Date())
+
   return (
     <section className="screen">
+      <div className="profile-hero">
+        <div>
+          <span>我的档案</span>
+          <h2>{profile.name || userDisplayName(user)}</h2>
+          <p>{user.email}</p>
+        </div>
+        <button className="icon-text-button" onClick={onLogout} type="button"><LogOut size={17} /> 退出登录</button>
+      </div>
+
+      <div className="profile-grid">
+        <div className="profile-card">
+          <div className="section-title compact">
+            <div><p>个人资料</p><h2>身体与习惯</h2></div>
+          </div>
+          <div className="profile-form">
+            <label>昵称<input value={profile.name || ''} onChange={(event) => onProfileChange({ name: event.target.value })} placeholder="你的名字" /></label>
+            <label>训练基础<select value={profile.trainingLevel || '恢复适应'} onChange={(event) => onProfileChange({ trainingLevel: event.target.value })}><option>恢复适应</option><option>稳步进阶</option><option>长期规律</option></select></label>
+            <label>年龄<input value={profile.age || ''} onChange={(event) => onProfileChange({ age: event.target.value })} inputMode="numeric" placeholder="28" /></label>
+            <label>身高<input value={profile.height || ''} onChange={(event) => onProfileChange({ height: event.target.value })} inputMode="decimal" placeholder="175 cm" /></label>
+            <label>体重<input value={profile.weight || ''} onChange={(event) => onProfileChange({ weight: event.target.value })} inputMode="decimal" placeholder="70 kg" /></label>
+            <label>偏好时间<select value={profile.preferredTime || '晚上'} onChange={(event) => onProfileChange({ preferredTime: event.target.value })}><option>早晨</option><option>中午</option><option>晚上</option><option>不固定</option></select></label>
+          </div>
+        </div>
+
+        <div className="profile-card">
+          <div className="section-title compact">
+            <div><p>当前目标</p><h2>{profile.goals?.join('、') || '还未设置目标'}</h2></div>
+          </div>
+          <textarea value={profile.goalText || ''} onChange={(event) => onProfileChange({ goalText: event.target.value })} placeholder="例如：减脂、增强心肺、每周训练 3 次" />
+          <label className="single-field">周目标<input value={profile.weeklyTarget || ''} onChange={(event) => onProfileChange({ weeklyTarget: event.target.value })} placeholder="每周 3 次" /></label>
+          {profile.feedback && <p className="coach-feedback">{profile.feedback}</p>}
+        </div>
+      </div>
+
+      <div className="profile-stats">
+        <div><strong>{stats.sessions}</strong><span>累计训练</span></div>
+        <div><strong>{stats.minutes}</strong><span>训练分钟</span></div>
+        <div><strong>{stats.calories}</strong><span>消耗 kcal</span></div>
+        <div><strong>{stats.completed}</strong><span>完成动作</span></div>
+      </div>
+
+      <div className="profile-grid">
+        <div className="profile-card">
+          <div className="section-title compact">
+            <div><p>接下来</p><h2>{nextPlan ? nextPlan.title : '暂无计划'}</h2></div>
+          </div>
+          <p className="profile-copy">{nextPlan ? `${nextPlan.dayLabel || nextPlan.date} · ${nextPlan.intensityLevel || '稳步进阶强度'} · ${nextPlan.totalMinutes} 分钟` : '到“计划”里选择训练日并生成计划。'}</p>
+        </div>
+
+        <div className="profile-card">
+          <div className="section-title compact">
+            <div><p>近期记录</p><h2>训练回顾</h2></div>
+          </div>
+          <div className="recent-list">
+            {latestDiary.length === 0 && <span>还没有训练记录。</span>}
+            {latestDiary.map((item) => <span key={item.id}>{item.date} · {item.title} · {item.duration} 分钟</span>)}
+          </div>
+        </div>
+      </div>
+
       <div className="watch-card">
         <div>
           <Apple size={24} />
