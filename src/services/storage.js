@@ -23,11 +23,12 @@ export function loadState() {
     const raw = localStorage.getItem(STORAGE_KEY) || LEGACY_KEYS.map((key) => localStorage.getItem(key)).find(Boolean)
     if (!raw) return defaultState
     const parsed = JSON.parse(raw)
+    const selectedDates = parsed.selectedDates || []
     return {
       ...defaultState,
       ...parsed,
-      selectedDates: parsed.selectedDates || [],
-      plans: (parsed.plans || []).filter((plan) => plan.date),
+      selectedDates,
+      plans: normalizePlanDates(parsed.plans || [], selectedDates),
       profile: {
         ...defaultState.profile,
         ...(parsed.profile || {}),
@@ -60,4 +61,28 @@ function sanitizeFeedback(text) {
   return text
     .replaceAll(String.fromCharCode(65, 73), '系统')
     .replaceAll(`人工${'智能'}`, '系统')
+}
+
+function normalizePlanDates(plans, selectedDates) {
+  const filtered = plans.filter((plan) => plan.date || plan.dateKey)
+  if (selectedDates.length === 0) return filtered
+  const selected = new Set(selectedDates)
+  const needsRepair = filtered.some((plan) => !selected.has(plan.date || plan.dateKey))
+  if (!needsRepair) return filtered
+
+  return filtered.map((plan, index) => {
+    const date = selectedDates[index]
+    if (!date) return plan
+    return {
+      ...plan,
+      date,
+      dateKey: date,
+      dayLabel: formatDateLabel(date),
+    }
+  })
+}
+
+function formatDateLabel(dateValue) {
+  const [, month, day] = dateValue.split('-')
+  return `${Number(month)}月${Number(day)}日`
 }

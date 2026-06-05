@@ -197,8 +197,8 @@ function calorieRate(focus, keywords) {
 }
 
 function formatDateLabel(dateValue) {
-  const date = new Date(`${dateValue}T00:00:00`)
-  return `${date.getMonth() + 1}月${date.getDate()}日`
+  const [, month, day] = dateValue.split('-')
+  return `${Number(month)}月${Number(day)}日`
 }
 
 function shortDelay() {
