@@ -27,10 +27,11 @@ export async function analyzeGoal(goalText) {
     return await postJsonWithTimeout('/api/analyze-goal', { goalText }, 4000)
   } catch {
     const keywords = extractKeywords(goalText)
+    const profile = inferTrainingProfile(goalText, [])
     await shortDelay()
     return {
       keywords,
-      feedback: `根据你的描述，重点会放在 ${keywords.join('、')}。选择训练日期后，可以立即生成对应计划。`,
+      feedback: `根据你的描述，重点会放在 ${keywords.join('、')}。${profile.summary}选择训练日期后，可以立即生成对应计划。`,
     }
   }
 }
@@ -65,11 +66,12 @@ export async function createPlansFromGoal({ goalText, keywords, selectedDates, d
     // GitHub Pages has no backend, and model APIs can be slow. Always keep generation usable.
   }
 
-  const plans = selectedDays.map((day, index) => buildPlan(day, planKeywords, index, diary || []))
+  const profile = inferTrainingProfile(goalText || '', diary || [])
+  const plans = selectedDays.map((day, index) => buildPlan(day, planKeywords, index, diary || [], profile))
   await shortDelay()
   return {
     keywords: planKeywords,
-    feedback: `已为 ${selectedDays.length} 个训练日生成计划，主题会围绕 ${planKeywords.join('、')} 轮换安排。`,
+    feedback: `已为 ${selectedDays.length} 个训练日生成计划，主题会围绕 ${planKeywords.join('、')} 轮换安排。${profile.summary}`,
     plans,
   }
 }
@@ -83,12 +85,12 @@ export function extractKeywords(goalText) {
   return [...new Set(matched.length ? matched : ['塑形', '体能'])].slice(0, 4)
 }
 
-function buildPlan(day, keywords, index, diary) {
+function buildPlan(day, keywords, index, diary, profile) {
   const focus = chooseFocus(keywords, index, diary)
-  const strength = chooseStrength(focus, keywords, index)
+  const strength = chooseStrength(focus, keywords, index, profile)
   const warmup = pickWarmup(focus)
   const stretch = pickStretch(focus)
-  const cardio = chooseCardio(focus, keywords)
+  const cardio = chooseCardio(focus, keywords, profile)
   const strengthMinutes = strength.reduce((sum, item) => sum + Number(item.sets) * 4, 0)
   const totalMinutes =
     warmup.reduce((sum, item) => sum + Number(item.duration), 0) +
@@ -112,6 +114,9 @@ function buildPlan(day, keywords, index, diary) {
     stretch,
     totalMinutes,
     caloriesEstimate: Math.round(totalMinutes * calorieRate(focus, keywords)),
+    intensityLevel: profile.level,
+    intensityReason: intensityReason(profile, focus, index),
+    trainingBenefit: trainingBenefit(focus, keywords),
     updatedAt: new Date().toISOString(),
   }
 }
@@ -131,7 +136,7 @@ function chooseFocus(keywords, index, diary) {
   return sequence.find((focus, itemIndex) => itemIndex >= index % sequence.length && recent[0] !== focus) || sequence[index % sequence.length]
 }
 
-function chooseStrength(focus, keywords, index) {
+function chooseStrength(focus, keywords, index, profile) {
   const text = keywords.join(' ')
   const preferred = exerciseLibrary.filter((exercise) => {
     if (focus === 'cardio') return exercise.muscle === 'cardio' || exercise.timed
@@ -142,23 +147,35 @@ function chooseStrength(focus, keywords, index) {
   return pool.map((exercise, exerciseIndex) => {
     const heavy = text.includes('力量') || text.includes('增肌')
     const fatLoss = text.includes('减脂') || text.includes('瘦腹')
+    const setAdjustment = profile.setAdjustment
+    const restAdjustment = profile.restAdjustment
+    const baseSets = heavy && exercise.muscle === 'legs' ? 5 : heavy ? 4 : Number(exercise.defaultSets || 3)
+    const baseRest = heavy ? 90 : fatLoss ? Math.max(30, Number(exercise.defaultRest || 45) - 15) : Number(exercise.defaultRest || 60)
     return {
       ...exercise,
-      sets: heavy && exercise.muscle === 'legs' ? 5 : heavy ? 4 : Number(exercise.defaultSets || 3),
+      sets: Math.max(2, baseSets + setAdjustment),
       reps: fatLoss && exercise.timed ? Math.max(30, Number(exercise.defaultReps || 30)) : Number(exercise.defaultReps || 12),
-      rest: heavy ? 90 : fatLoss ? Math.max(30, Number(exercise.defaultRest || 45) - 15) : Number(exercise.defaultRest || 60),
-      weight: heavy && !exercise.timed ? String(40 + index * 5 + exerciseIndex * 5) : '',
+      rest: Math.max(30, baseRest + restAdjustment),
+      weight: heavy && !exercise.timed ? String(Math.max(20, 40 + index * 5 + exerciseIndex * 5 + profile.weightAdjustment)) : '',
       completedSets: 0,
     }
   })
 }
 
-function chooseCardio(focus, keywords) {
+function chooseCardio(focus, keywords, profile) {
   const text = keywords.join(' ')
-  if (text.includes('减脂') || text.includes('瘦腹')) return cardioOptions.fatloss
-  if (text.includes('增肌') || text.includes('力量')) return cardioOptions.muscle
-  if (focus === 'core') return cardioOptions.core
-  return cardioOptions.shape
+  const option = text.includes('减脂') || text.includes('瘦腹')
+    ? cardioOptions.fatloss
+    : text.includes('增肌') || text.includes('力量')
+      ? cardioOptions.muscle
+      : focus === 'core'
+        ? cardioOptions.core
+        : cardioOptions.shape
+  return {
+    ...option,
+    duration: Math.max(8, Number(option.duration) + profile.cardioAdjustment),
+    intensity: `${option.intensity}；本次按${profile.level}安排。`,
+  }
 }
 
 function pickWarmup(focus) {
@@ -194,6 +211,82 @@ function calorieRate(focus, keywords) {
   if (focus === 'legs') return 6.6
   if (focus === 'core') return 6.8
   return 6.1
+}
+
+function inferTrainingProfile(goalText, diary) {
+  const text = goalText || ''
+  const sessions = Array.isArray(diary) ? diary.length : 0
+  const recentSessions = Array.isArray(diary)
+    ? diary.filter((item) => daysSince(item.createdAt || item.date) <= 21).length
+    : 0
+  const mentionsRestart = /很久没练|很久没健身|久未|刚开始|新手|零基础|恢复训练|重新开始/.test(text)
+  const mentionsRegular = /经常|规律|一直|按计划|每周|进阶|加强|提高强度/.test(text)
+
+  if (mentionsRestart || (!mentionsRegular && sessions === 0)) {
+    return {
+      level: '恢复适应强度',
+      summary: '考虑到你可能处在恢复或起步阶段，计划会降低总量、延长休息，先找回动作质量和训练习惯。',
+      setAdjustment: -1,
+      restAdjustment: 15,
+      cardioAdjustment: -6,
+      weightAdjustment: -15,
+      reason: '久未训练或训练记录较少时，肌肉、关节和心肺都需要重新适应，先控制强度能降低酸痛和受伤风险。',
+    }
+  }
+
+  if (mentionsRegular || recentSessions >= 6) {
+    return {
+      level: '进阶提升强度',
+      summary: '你有较稳定的训练基础，计划会适度增加训练容量或负重刺激，推动继续进步。',
+      setAdjustment: 1,
+      restAdjustment: -10,
+      cardioAdjustment: 4,
+      weightAdjustment: 10,
+      reason: '规律训练后身体已经适应基础刺激，需要通过增加组数、缩短休息或提高负重来继续产生训练适应。',
+    }
+  }
+
+  return {
+    level: '稳步进阶强度',
+    summary: '计划会保持中等强度，在动作质量稳定的前提下逐步增加训练刺激。',
+    setAdjustment: 0,
+    restAdjustment: 0,
+    cardioAdjustment: 0,
+    weightAdjustment: 0,
+    reason: '中等强度适合大多数有一定基础但尚未稳定进阶的人，可以兼顾训练效果和恢复。',
+  }
+}
+
+function intensityReason(profile, focus, index) {
+  const focusText = {
+    legs: '臀腿训练对体能和恢复要求更高',
+    push: '胸肩推力训练需要肩关节稳定和动作控制',
+    pull: '背部训练需要先建立肩胛控制和发力感',
+    core: '核心训练适合用稳定控制打基础',
+    cardio: '体能训练会明显提高心率和疲劳感',
+  }[focus] || '综合训练需要兼顾动作质量和恢复'
+  return `${profile.reason}第 ${index + 1} 次训练安排为${profile.level}，因为${focusText}。`
+}
+
+function trainingBenefit(focus, keywords) {
+  const text = keywords.join(' ')
+  const benefits = {
+    legs: '帮助加强臀腿力量、髋膝稳定和基础代谢，对翘臀、减脂和力量提升都很关键。',
+    push: '帮助加强胸肩推力、上肢线条和肩带稳定，让上半身训练更有支撑。',
+    pull: '帮助加强背部宽度、肩胛控制和体态，对改善含胸、塑造倒三角很有帮助。',
+    core: '帮助加强腹部抗伸展和骨盆控制，让腰腹更稳定，也能提升深蹲、硬拉等动作表现。',
+    cardio: '帮助提升心肺耐力、热量消耗和训练恢复能力，适合减脂和体能提升。',
+  }
+  if (text.includes('减脂') || text.includes('瘦腹')) return `${benefits[focus] || benefits.core} 本次也会提高消耗，帮助腰腹和体脂管理。`
+  if (text.includes('增肌') || text.includes('力量')) return `${benefits[focus] || benefits.legs} 本次会提供足够机械张力，帮助肌肉和力量增长。`
+  return benefits[focus] || '帮助提升全身协调、基础力量和训练习惯。'
+}
+
+function daysSince(value) {
+  if (!value) return Number.POSITIVE_INFINITY
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return Number.POSITIVE_INFINITY
+  return (Date.now() - date.getTime()) / 86400000
 }
 
 function formatDateLabel(dateValue) {

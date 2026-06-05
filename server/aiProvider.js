@@ -12,7 +12,7 @@ const planSchema = {
         items: {
           type: 'object',
           additionalProperties: false,
-          required: ['dateKey', 'dayLabel', 'source', 'focus', 'title', 'keywords', 'warmup', 'strength', 'cardio', 'stretch', 'totalMinutes', 'caloriesEstimate'],
+          required: ['dateKey', 'dayLabel', 'source', 'focus', 'title', 'keywords', 'warmup', 'strength', 'cardio', 'stretch', 'totalMinutes', 'caloriesEstimate', 'intensityLevel', 'intensityReason', 'trainingBenefit'],
           properties: {
             dateKey: { type: 'string' },
             date: { type: 'string' },
@@ -36,6 +36,9 @@ const planSchema = {
             stretch: { type: 'array', items: warmupItemSchema() },
             totalMinutes: { type: 'number' },
             caloriesEstimate: { type: 'number' },
+            intensityLevel: { type: 'string' },
+            intensityReason: { type: 'string' },
+            trainingBenefit: { type: 'string' },
           },
         },
       },
@@ -86,6 +89,8 @@ export async function generateWithProvider(env, body) {
     '你是专业健身计划生成服务，必须只输出 JSON。',
     '根据用户目标和 selectedDays 为每个训练日生成一个计划。',
     '计划要适合普通健身房训练，动作讲解清楚，训练日之间避免完全重复。',
+    '必须结合用户健身情况调整强度：很久没练、刚开始、新手、零基础时降低总量、延长休息、以动作质量和恢复为主；经常按计划训练、有规律训练记录或用户要求进阶时，可以适度增加组数、负重、密度或有氧时长；信息不明确时使用中等稳步进阶强度。',
+    '每个计划必须填写 intensityLevel、intensityReason、trainingBenefit。intensityReason 要说明为什么按这个强度安排，并明确关联用户训练基础和当天训练重点；trainingBenefit 要说明这些训练可以加强哪些肌群、能力或体态目标。',
     'strength 每天 3 到 5 个动作；warmup 2 到 3 个；stretch 2 到 3 个。',
     'strength 动作必须包含 id、name、category、muscle、equipment、illustration、image、sets、reps、rest、weight、repLabel、timed。',
     'timed 动作 reps 表示秒数，repLabel 用“秒”；普通动作 repLabel 用“次”或空字符串。',
@@ -181,6 +186,7 @@ function providerConfig(env) {
 
 function normalizePlanPayload(payload, body) {
   const keywords = normalizeKeywords(payload.keywords?.length ? payload.keywords : body.keywords)
+  const fallbackIntensity = inferFallbackIntensity(body)
   const plans = (payload.plans || []).map((plan, index) => {
     const day = body.selectedDays?.[index] || {}
     return {
@@ -191,6 +197,9 @@ function normalizePlanPayload(payload, body) {
       source: plan.source || '推荐',
       goals: keywords,
       keywords,
+      intensityLevel: plan.intensityLevel || fallbackIntensity.level,
+      intensityReason: plan.intensityReason || `${fallbackIntensity.reason}本日重点是${plan.title || plan.focus || '综合训练'}，所以按${fallbackIntensity.level}安排。`,
+      trainingBenefit: plan.trainingBenefit || '本次训练会帮助提升基础力量、心肺耐力和动作稳定性，为后续进阶打好基础。',
       updatedAt: new Date().toISOString(),
     }
   })
@@ -199,6 +208,40 @@ function normalizePlanPayload(payload, body) {
     feedback: payload.feedback || `已生成 ${plans.length} 个训练日计划。`,
     plans,
   }
+}
+
+function inferFallbackIntensity(body) {
+  const text = String(body.goalText || '')
+  const diary = Array.isArray(body.diary) ? body.diary : []
+  const recentSessions = diary.filter((item) => daysSince(item.createdAt || item.date) <= 21).length
+  const mentionsRestart = /很久没练|很久没健身|久未|刚开始|新手|零基础|恢复训练|重新开始/.test(text)
+  const mentionsRegular = /经常|规律|一直|按计划|每周|进阶|加强|提高强度/.test(text)
+
+  if (mentionsRestart || (!mentionsRegular && diary.length === 0)) {
+    return {
+      level: '恢复适应强度',
+      reason: '考虑到用户可能处在恢复或起步阶段，需要先降低总量、延长休息，找回动作质量和训练习惯。',
+    }
+  }
+
+  if (mentionsRegular || recentSessions >= 6) {
+    return {
+      level: '进阶提升强度',
+      reason: '用户有较稳定的训练基础，可以适度增加训练容量、密度或负重，推动继续进步。',
+    }
+  }
+
+  return {
+    level: '稳步进阶强度',
+    reason: '用户具备一定训练基础但进阶信息不明确，适合用中等强度兼顾效果和恢复。',
+  }
+}
+
+function daysSince(value) {
+  if (!value) return Number.POSITIVE_INFINITY
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return Number.POSITIVE_INFINITY
+  return (Date.now() - date.getTime()) / 86400000
 }
 
 function normalizeKeywords(keywords) {

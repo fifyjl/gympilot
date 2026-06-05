@@ -631,6 +631,10 @@ function RunnerView({ runner, watch, onCompleteSet, onFinish, onPause, onSkip })
 }
 
 function PlanCard({ plan, editing, onBegin, onEdit, onTitleChange, showDetails }) {
+  const intensityLevel = plan.intensityLevel || '稳步进阶强度'
+  const intensityReason = plan.intensityReason || '按中等强度安排，先保证动作质量和恢复，再逐步增加训练刺激。'
+  const trainingBenefit = plan.trainingBenefit || '本次训练会帮助提升基础力量、心肺耐力和动作稳定性，为后续进阶打好基础。'
+
   return (
     <article className="plan-card">
       <div className="card-head">
@@ -646,12 +650,25 @@ function PlanCard({ plan, editing, onBegin, onEdit, onTitleChange, showDetails }
         <span><Dumbbell size={15} /> {plan.strength.length}个动作</span>
       </div>
       {showDetails && (
-        <div className="plan-sections">
-          <MiniSection title="热身" items={plan.warmup.map((item) => `${item.name} · ${item.duration}分钟`)} />
-          <MiniSection title="无氧训练" items={plan.strength.map((item) => `${item.name} · ${item.sets}组 x ${item.reps}${item.repLabel || '次'} · 休${item.rest}秒`)} />
-          <MiniSection title="有氧训练" items={[`${plan.cardio.type} · ${plan.cardio.duration}分钟`, plan.cardio.intensity]} />
-          <MiniSection title="拉伸放松" items={plan.stretch.map((item) => `${item.name} · ${item.duration}分钟`)} />
-        </div>
+        <>
+          <div className="plan-rationale">
+            <div className="rationale-card intensity">
+              <span>强度安排</span>
+              <strong>{intensityLevel}</strong>
+              <p>{intensityReason}</p>
+            </div>
+            <div className="rationale-card">
+              <span>为什么这样练</span>
+              <p>{trainingBenefit}</p>
+            </div>
+          </div>
+          <div className="plan-sections">
+            <MiniSection title="热身" items={plan.warmup.map((item) => `${item.name} · ${item.duration}分钟`)} />
+            <MiniSection title="无氧训练" items={plan.strength.map((item) => `${item.name} · ${item.sets}组 x ${item.reps}${item.repLabel || '次'} · 休${item.rest}秒`)} />
+            <MiniSection title="有氧训练" items={[`${plan.cardio.type} · ${plan.cardio.duration}分钟`, plan.cardio.intensity]} />
+            <MiniSection title="拉伸放松" items={plan.stretch.map((item) => `${item.name} · ${item.duration}分钟`)} />
+          </div>
+        </>
       )}
       {onEdit && (
         <div className="card-actions">

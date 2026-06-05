@@ -441,6 +441,49 @@ textarea {
   margin: 12px 0;
 }
 
+.plan-rationale {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.35fr);
+  gap: 8px;
+  margin: 0 0 8px;
+}
+
+.rationale-card {
+  display: grid;
+  gap: 6px;
+  border-radius: 8px;
+  padding: 12px;
+  color: #17212f;
+  background: #f4f7fb;
+  border: 1px solid #e0e7f0;
+}
+
+.rationale-card.intensity {
+  background: linear-gradient(135deg, #17212f 0%, #2f4057 100%);
+  color: #ffffff;
+  border-color: transparent;
+}
+
+.rationale-card span {
+  color: inherit;
+  font-size: 12px;
+  font-weight: 850;
+  opacity: 0.74;
+}
+
+.rationale-card strong {
+  font-size: 16px;
+  line-height: 1.2;
+}
+
+.rationale-card p {
+  margin: 0;
+  color: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.55;
+}
+
 .plan-sections {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1104,6 +1147,7 @@ textarea {
   }
 
   .plan-sections,
+  .plan-rationale,
   .library-grid,
   .chart-card {
     grid-template-columns: 1fr 1fr;
@@ -1157,6 +1201,7 @@ textarea {
 
   .calendar-grid,
   .plan-sections,
+  .plan-rationale,
   .library-grid,
   .chart-card {
     grid-template-columns: 1fr;
