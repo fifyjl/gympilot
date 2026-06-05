@@ -67,7 +67,11 @@ export async function createPlansFromGoal({ goalText, keywords, selectedDates, d
   }
 
   const profile = inferTrainingProfile(goalText || '', diary || [])
-  const plans = selectedDays.map((day, index) => buildPlan(day, planKeywords, index, diary || [], profile))
+  const plans = []
+  selectedDays.forEach((day, index) => {
+    const context = buildPlanContext(day, index, plans, diary || [])
+    plans.push(buildPlan(day, planKeywords, index, diary || [], profile, context))
+  })
   await shortDelay()
   return {
     keywords: planKeywords,
@@ -85,12 +89,12 @@ export function extractKeywords(goalText) {
   return [...new Set(matched.length ? matched : ['塑形', '体能'])].slice(0, 4)
 }
 
-function buildPlan(day, keywords, index, diary, profile) {
-  const focus = chooseFocus(keywords, index, diary)
-  const strength = chooseStrength(focus, keywords, index, profile)
+function buildPlan(day, keywords, index, diary, profile, context) {
+  const focus = chooseFocus(keywords, index, diary, context)
+  const strength = chooseStrength(focus, keywords, index, profile, context)
   const warmup = pickWarmup(focus)
   const stretch = pickStretch(focus)
-  const cardio = chooseCardio(focus, keywords, profile)
+  const cardio = chooseCardio(focus, keywords, profile, context)
   const strengthMinutes = strength.reduce((sum, item) => sum + Number(item.sets) * 4, 0)
   const totalMinutes =
     warmup.reduce((sum, item) => sum + Number(item.duration), 0) +
@@ -115,13 +119,13 @@ function buildPlan(day, keywords, index, diary, profile) {
     totalMinutes,
     caloriesEstimate: Math.round(totalMinutes * calorieRate(focus, keywords)),
     intensityLevel: profile.level,
-    intensityReason: intensityReason(profile, focus, index),
-    trainingBenefit: trainingBenefit(focus, keywords),
+    intensityReason: intensityReason(profile, focus, index, day, context),
+    trainingBenefit: trainingBenefit(focus, keywords, context),
     updatedAt: new Date().toISOString(),
   }
 }
 
-function chooseFocus(keywords, index, diary) {
+function chooseFocus(keywords, index, diary, context) {
   const text = keywords.join(' ')
   const sequence = text.includes('翘臀') || text.includes('力量')
     ? ['legs', 'core', 'legs', 'pull']
@@ -133,10 +137,11 @@ function chooseFocus(keywords, index, diary) {
           ? ['core', 'cardio', 'legs', 'core']
           : ['push', 'legs', 'pull', 'core']
   const recent = diary.slice(0, 2).flatMap((item) => item.completedExercises || []).map((item) => item.muscle)
-  return sequence.find((focus, itemIndex) => itemIndex >= index % sequence.length && recent[0] !== focus) || sequence[index % sequence.length]
+  const avoided = new Set([recent[0], context.previousFocus].filter(Boolean))
+  return sequence.find((focus, itemIndex) => itemIndex >= index % sequence.length && !avoided.has(focus)) || sequence[index % sequence.length]
 }
 
-function chooseStrength(focus, keywords, index, profile) {
+function chooseStrength(focus, keywords, index, profile, context) {
   const text = keywords.join(' ')
   const preferred = exerciseLibrary.filter((exercise) => {
     if (focus === 'cardio') return exercise.muscle === 'cardio' || exercise.timed
@@ -147,8 +152,8 @@ function chooseStrength(focus, keywords, index, profile) {
   return pool.map((exercise, exerciseIndex) => {
     const heavy = text.includes('力量') || text.includes('增肌')
     const fatLoss = text.includes('减脂') || text.includes('瘦腹')
-    const setAdjustment = profile.setAdjustment
-    const restAdjustment = profile.restAdjustment
+    const setAdjustment = profile.setAdjustment + context.setAdjustment
+    const restAdjustment = profile.restAdjustment + context.restAdjustment
     const baseSets = heavy && exercise.muscle === 'legs' ? 5 : heavy ? 4 : Number(exercise.defaultSets || 3)
     const baseRest = heavy ? 90 : fatLoss ? Math.max(30, Number(exercise.defaultRest || 45) - 15) : Number(exercise.defaultRest || 60)
     return {
@@ -156,13 +161,13 @@ function chooseStrength(focus, keywords, index, profile) {
       sets: Math.max(2, baseSets + setAdjustment),
       reps: fatLoss && exercise.timed ? Math.max(30, Number(exercise.defaultReps || 30)) : Number(exercise.defaultReps || 12),
       rest: Math.max(30, baseRest + restAdjustment),
-      weight: heavy && !exercise.timed ? String(Math.max(20, 40 + index * 5 + exerciseIndex * 5 + profile.weightAdjustment)) : '',
+      weight: heavy && !exercise.timed ? String(Math.max(20, 40 + index * 5 + exerciseIndex * 5 + profile.weightAdjustment + context.weightAdjustment)) : '',
       completedSets: 0,
     }
   })
 }
 
-function chooseCardio(focus, keywords, profile) {
+function chooseCardio(focus, keywords, profile, context) {
   const text = keywords.join(' ')
   const option = text.includes('减脂') || text.includes('瘦腹')
     ? cardioOptions.fatloss
@@ -173,8 +178,8 @@ function chooseCardio(focus, keywords, profile) {
         : cardioOptions.shape
   return {
     ...option,
-    duration: Math.max(8, Number(option.duration) + profile.cardioAdjustment),
-    intensity: `${option.intensity}；本次按${profile.level}安排。`,
+    duration: Math.max(8, Number(option.duration) + profile.cardioAdjustment + context.cardioAdjustment),
+    intensity: `${option.intensity}；本次按${profile.level}安排，${context.cardioNote}。`,
   }
 }
 
@@ -211,6 +216,71 @@ function calorieRate(focus, keywords) {
   if (focus === 'legs') return 6.6
   if (focus === 'core') return 6.8
   return 6.1
+}
+
+function buildPlanContext(day, index, plannedBefore, diary) {
+  const previousPlan = plannedBefore[plannedBefore.length - 1]
+  const previousDate = previousPlan?.date || previousPlan?.dateKey
+  const gapDays = previousDate ? daysBetween(previousDate, day.date) : null
+  const recentDiary = [...(diary || [])]
+    .filter((item) => daysSince(item.createdAt || item.date) <= 28)
+    .sort((a, b) => new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date))
+  const lastWorkout = recentDiary[0]
+  const completion = completionRatio(lastWorkout)
+  const skippedCount = Number(lastWorkout?.skipped?.length || 0)
+  const needsRecovery = Boolean(gapDays === 1 || completion < 0.72 || skippedCount >= 2)
+  const longGap = Boolean(gapDays && gapDays >= 4)
+  const weekday = weekdayName(day.date)
+
+  let setAdjustment = 0
+  let restAdjustment = 0
+  let cardioAdjustment = 0
+  let weightAdjustment = 0
+  if (needsRecovery) {
+    setAdjustment -= 1
+    restAdjustment += 15
+    cardioAdjustment -= 3
+    weightAdjustment -= 5
+  } else if (longGap) {
+    restAdjustment += 5
+    cardioAdjustment -= 2
+  } else if (gapDays && gapDays >= 2 && completion >= 0.9 && skippedCount === 0) {
+    cardioAdjustment += 2
+    weightAdjustment += 5
+  }
+
+  const intervalNote = !previousPlan
+    ? `${day.label}${weekday}是本轮第 1 个训练日，先建立节奏`
+    : gapDays === 1
+      ? `距离上次${previousPlan.title}只隔 1 天，需要控制连续疲劳`
+      : gapDays && gapDays >= 4
+        ? `距离上次${previousPlan.title}间隔 ${gapDays} 天，先用可控强度重新进入状态`
+        : `距离上次${previousPlan.title}间隔 ${gapDays || 2} 天，恢复时间较合理，可以稳步推进`
+  const diaryNote = lastWorkout
+    ? `最近一次实际训练完成了 ${Math.round(completion * 100)}%，跳过 ${skippedCount} 项，时长 ${lastWorkout.duration || '--'} 分钟`
+    : '还没有实际训练日记，先按目标和日期节奏保守建立基线'
+  const cardioNote = needsRecovery
+    ? '有氧用于促进恢复，不追求冲刺'
+    : longGap
+      ? '有氧保持中等节奏，帮助重新唤醒心肺'
+      : '有氧作为本次训练的收尾刺激，帮助提升耐力和消耗'
+
+  return {
+    index,
+    previousFocus: previousPlan?.focus || '',
+    previousTitle: previousPlan?.title || '',
+    gapDays,
+    weekday,
+    intervalNote,
+    diaryNote,
+    cardioNote,
+    setAdjustment,
+    restAdjustment,
+    cardioAdjustment,
+    weightAdjustment,
+    needsRecovery,
+    longGap,
+  }
 }
 
 function inferTrainingProfile(goalText, diary) {
@@ -257,7 +327,7 @@ function inferTrainingProfile(goalText, diary) {
   }
 }
 
-function intensityReason(profile, focus, index) {
+function intensityReason(profile, focus, index, day, context) {
   const focusText = {
     legs: '臀腿训练对体能和恢复要求更高',
     push: '胸肩推力训练需要肩关节稳定和动作控制',
@@ -265,10 +335,15 @@ function intensityReason(profile, focus, index) {
     core: '核心训练适合用稳定控制打基础',
     cardio: '体能训练会明显提高心率和疲劳感',
   }[focus] || '综合训练需要兼顾动作质量和恢复'
-  return `${profile.reason}第 ${index + 1} 次训练安排为${profile.level}，因为${focusText}。`
+  const recoveryText = context.needsRecovery
+    ? '本次会减少一点容量并延长休息，避免连续疲劳影响动作质量。'
+    : context.longGap
+      ? '间隔较长时不直接拉满强度，先用稳定容量找回训练状态。'
+      : '恢复窗口较合适，本次可以在动作稳定的前提下推进训练刺激。'
+  return `${day.label}${context.weekday}安排第 ${index + 1} 次训练。${context.intervalNote}；${context.diaryNote}。${profile.reason}${recoveryText}当天重点是${focusText}，所以设为${profile.level}。`
 }
 
-function trainingBenefit(focus, keywords) {
+function trainingBenefit(focus, keywords, context) {
   const text = keywords.join(' ')
   const benefits = {
     legs: '帮助加强臀腿力量、髋膝稳定和基础代谢，对翘臀、减脂和力量提升都很关键。',
@@ -277,9 +352,12 @@ function trainingBenefit(focus, keywords) {
     core: '帮助加强腹部抗伸展和骨盆控制，让腰腹更稳定，也能提升深蹲、硬拉等动作表现。',
     cardio: '帮助提升心肺耐力、热量消耗和训练恢复能力，适合减脂和体能提升。',
   }
-  if (text.includes('减脂') || text.includes('瘦腹')) return `${benefits[focus] || benefits.core} 本次也会提高消耗，帮助腰腹和体脂管理。`
-  if (text.includes('增肌') || text.includes('力量')) return `${benefits[focus] || benefits.legs} 本次会提供足够机械张力，帮助肌肉和力量增长。`
-  return benefits[focus] || '帮助提升全身协调、基础力量和训练习惯。'
+  const sequenceText = context.previousTitle
+    ? `和前一次${context.previousTitle}错开重点，减少同一部位连续疲劳。`
+    : '作为本轮第一天，它会建立动作质量和心肺基线。'
+  if (text.includes('减脂') || text.includes('瘦腹')) return `${benefits[focus] || benefits.core} ${sequenceText} 本次也会提高消耗，帮助腰腹和体脂管理。`
+  if (text.includes('增肌') || text.includes('力量')) return `${benefits[focus] || benefits.legs} ${sequenceText} 本次会提供足够机械张力，帮助肌肉和力量增长。`
+  return `${benefits[focus] || '帮助提升全身协调、基础力量和训练习惯。'} ${sequenceText}`
 }
 
 function daysSince(value) {
@@ -287,6 +365,27 @@ function daysSince(value) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return Number.POSITIVE_INFINITY
   return (Date.now() - date.getTime()) / 86400000
+}
+
+function daysBetween(startValue, endValue) {
+  const start = new Date(`${startValue}T00:00:00`)
+  const end = new Date(`${endValue}T00:00:00`)
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null
+  return Math.round((end - start) / 86400000)
+}
+
+function completionRatio(item) {
+  if (!item) return 1
+  const completedSets = (item.completedExercises || []).reduce((sum, exercise) => sum + Number(exercise.sets || 0), 0)
+  const skipped = Number(item.skipped?.length || 0)
+  if (completedSets === 0 && skipped === 0) return 1
+  return completedSets / Math.max(1, completedSets + skipped * 3)
+}
+
+function weekdayName(value) {
+  const date = new Date(`${value}T00:00:00`)
+  if (Number.isNaN(date.getTime())) return ''
+  return `周${['日', '一', '二', '三', '四', '五', '六'][date.getDay()]}`
 }
 
 function formatDateLabel(dateValue) {

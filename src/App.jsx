@@ -80,11 +80,7 @@ function App() {
     const tick = window.setInterval(() => {
       setRunner((current) => {
         if (!current || current.paused) return current
-        if (current.timerMode === 'up') {
-          if (current.timerLeft + 1 < current.timerTarget) return { ...current, timerLeft: current.timerLeft + 1 }
-          return advanceRunnerSession(current, (session) => finishWorkoutRef.current?.(session))
-        }
-        if (current.timerLeft > 1) return { ...current, timerLeft: current.timerLeft - 1 }
+        if (current.timerLeft + 1 < current.timerTarget) return { ...current, timerLeft: current.timerLeft + 1 }
         return advanceRunnerSession(current, (session) => finishWorkoutRef.current?.(session))
       })
     }, 1000)
@@ -154,13 +150,22 @@ function App() {
   }
 
   function toggleDate(dateValue) {
+    const exists = state.selectedDates.includes(dateValue)
+    const remainingPlans = exists
+      ? state.plans.filter((plan) => (plan.date || plan.dateKey) !== dateValue)
+      : state.plans
     updateState((current) => {
-      const exists = current.selectedDates.includes(dateValue)
       const selectedDates = exists
         ? current.selectedDates.filter((item) => item !== dateValue)
         : [...current.selectedDates, dateValue].sort()
-      return { ...current, selectedDates }
+      const plans = exists
+        ? current.plans.filter((plan) => (plan.date || plan.dateKey) !== dateValue)
+        : current.plans
+      return { ...current, selectedDates, plans }
     })
+    if (exists && selectedPlanId && !remainingPlans.some((plan) => plan.id === selectedPlanId)) {
+      setSelectedPlanId(remainingPlans[0]?.id || null)
+    }
   }
 
   function updatePlanTitle(planId, title) {
@@ -173,7 +178,6 @@ function App() {
   function beginWorkout(workout, source = workout.source || '推荐') {
     if (!workout?.strength?.length) return
     const firstExercise = workout.strength[0]
-    const timerMode = workout.id?.startsWith('custom') ? 'up' : 'down'
     const firstDuration = setDuration(firstExercise)
     setRunner({
       workout,
@@ -182,9 +186,8 @@ function App() {
       exerciseIndex: 0,
       setIndex: 1,
       phase: 'work',
-      timerMode,
       timerTarget: firstDuration,
-      timerLeft: timerMode === 'up' ? 0 : firstDuration,
+      timerLeft: 0,
       paused: false,
       completed: [],
       skipped: [],
@@ -609,7 +612,7 @@ function RunnerView({ runner, watch, onCompleteSet, onFinish, onPause, onSkip })
           <div className="exercise-figure">{isResting ? 'REST' : exercise.image}</div>
         </div>
         <div className="watch-strip">
-          <span><Timer size={16} /> {formatSeconds(runner.timerLeft)}</span>
+          <span><Timer size={16} /> {isResting ? '已休息' : '已训练'} {formatSeconds(runner.timerLeft)} / {formatSeconds(runner.timerTarget)}</span>
           <span><HeartPulse size={16} /> {watch.latest?.heartRate || '--'} bpm</span>
           <span><Flame size={16} /> {watch.latest?.calories || '--'} kcal</span>
         </div>
@@ -833,7 +836,7 @@ function setDuration(exercise) {
 function timerFields(session, target) {
   return {
     timerTarget: target,
-    timerLeft: session.timerMode === 'up' ? 0 : target,
+    timerLeft: 0,
   }
 }
 
