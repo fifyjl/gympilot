@@ -80,6 +80,10 @@ function App() {
     const tick = window.setInterval(() => {
       setRunner((current) => {
         if (!current || current.paused) return current
+        if (current.timerMode === 'up') {
+          if (current.timerLeft + 1 < current.timerTarget) return { ...current, timerLeft: current.timerLeft + 1 }
+          return advanceRunnerSession(current, (session) => finishWorkoutRef.current?.(session))
+        }
         if (current.timerLeft > 1) return { ...current, timerLeft: current.timerLeft - 1 }
         return advanceRunnerSession(current, (session) => finishWorkoutRef.current?.(session))
       })
@@ -163,6 +167,8 @@ function App() {
   function beginWorkout(workout, source = workout.source || '推荐') {
     if (!workout?.strength?.length) return
     const firstExercise = workout.strength[0]
+    const timerMode = workout.id?.startsWith('custom') ? 'up' : 'down'
+    const firstDuration = setDuration(firstExercise)
     setRunner({
       workout,
       source,
@@ -170,7 +176,9 @@ function App() {
       exerciseIndex: 0,
       setIndex: 1,
       phase: 'work',
-      timerLeft: setDuration(firstExercise),
+      timerMode,
+      timerTarget: firstDuration,
+      timerLeft: timerMode === 'up' ? 0 : firstDuration,
       paused: false,
       completed: [],
       skipped: [],
@@ -188,13 +196,14 @@ function App() {
       const exercise = current.workout.strength[current.exerciseIndex]
       if (current.exerciseIndex < current.workout.strength.length - 1) {
         const nextExercise = current.workout.strength[current.exerciseIndex + 1]
+        const nextDuration = setDuration(nextExercise)
         return {
           ...current,
           skipped: [...current.skipped, exercise.name],
           phase: 'work',
           exerciseIndex: current.exerciseIndex + 1,
           setIndex: 1,
-          timerLeft: setDuration(nextExercise),
+          ...timerFields(current, nextDuration),
         }
       }
       finishWorkout({ ...current, skipped: [...current.skipped, exercise.name] })
@@ -798,6 +807,13 @@ function setDuration(exercise) {
   return exercise.timed ? Number(exercise.reps) : 30
 }
 
+function timerFields(session, target) {
+  return {
+    timerTarget: target,
+    timerLeft: session.timerMode === 'up' ? 0 : target,
+  }
+}
+
 function advanceRunnerSession(session, finishWorkout) {
   return session.phase === 'work'
     ? markSetCompleteSession(session, true, finishWorkout)
@@ -817,7 +833,7 @@ function markSetCompleteSession(session, fromTimer, finishWorkout) {
   }
   const next = { ...session, completed: [...session.completed, completedSet] }
   if (exercise.rest > 0 && !isLastSetOfWorkout(next)) {
-    return { ...next, phase: 'rest', timerLeft: Number(exercise.rest) }
+    return { ...next, phase: 'rest', ...timerFields(next, Number(exercise.rest)) }
   }
   return moveAfterRestSession(next, finishWorkout)
 }
@@ -825,11 +841,11 @@ function markSetCompleteSession(session, fromTimer, finishWorkout) {
 function moveAfterRestSession(session, finishWorkout) {
   const exercise = session.workout.strength[session.exerciseIndex]
   if (session.setIndex < Number(exercise.sets)) {
-    return { ...session, phase: 'work', setIndex: session.setIndex + 1, timerLeft: setDuration(exercise) }
+    return { ...session, phase: 'work', setIndex: session.setIndex + 1, ...timerFields(session, setDuration(exercise)) }
   }
   if (session.exerciseIndex < session.workout.strength.length - 1) {
     const nextExercise = session.workout.strength[session.exerciseIndex + 1]
-    return { ...session, phase: 'work', exerciseIndex: session.exerciseIndex + 1, setIndex: 1, timerLeft: setDuration(nextExercise) }
+    return { ...session, phase: 'work', exerciseIndex: session.exerciseIndex + 1, setIndex: 1, ...timerFields(session, setDuration(nextExercise)) }
   }
   finishWorkout(session)
   return null
