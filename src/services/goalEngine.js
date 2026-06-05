@@ -23,11 +23,15 @@ const focusTitles = {
 }
 
 export async function analyzeGoal(goalText) {
-  const keywords = extractKeywords(goalText)
-  await shortDelay()
-  return {
-    keywords,
-    feedback: `根据你的描述，重点会放在 ${keywords.join('、')}。选择训练日期后，可以立即生成对应计划。`,
+  try {
+    return await postJsonWithTimeout('/api/analyze-goal', { goalText }, 4000)
+  } catch {
+    const keywords = extractKeywords(goalText)
+    await shortDelay()
+    return {
+      keywords,
+      feedback: `根据你的描述，重点会放在 ${keywords.join('、')}。选择训练日期后，可以立即生成对应计划。`,
+    }
   }
 }
 
@@ -38,6 +42,28 @@ export async function createPlansFromGoal({ goalText, keywords, selectedDates, d
     date,
     label: formatDateLabel(date),
   }))
+
+  try {
+    const payload = await postJsonWithTimeout('/api/generate-plan', {
+      goalText,
+      keywords: planKeywords,
+      selectedDays,
+      diary,
+    }, Number(import.meta.env.VITE_AI_TIMEOUT_MS || 7000))
+
+    return {
+      keywords: payload.keywords || planKeywords,
+      feedback: payload.feedback || `已为 ${selectedDays.length} 个训练日生成计划。`,
+      plans: (payload.plans || []).map((plan) => ({
+        ...plan,
+        id: createId(`plan-${plan.dateKey || plan.date}`),
+        goals: payload.keywords || planKeywords,
+        updatedAt: new Date().toISOString(),
+      })),
+    }
+  } catch {
+    // GitHub Pages has no backend, and model APIs can be slow. Always keep generation usable.
+  }
 
   const plans = selectedDays.map((day, index) => buildPlan(day, planKeywords, index, diary || []))
   await shortDelay()
@@ -179,4 +205,21 @@ function shortDelay() {
   return new Promise((resolve) => {
     window.setTimeout(resolve, 250)
   })
+}
+
+async function postJsonWithTimeout(url, body, timeoutMs) {
+  const controller = new AbortController()
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    })
+    if (!response.ok) throw new Error(`request_failed_${response.status}`)
+    return await response.json()
+  } finally {
+    window.clearTimeout(timeout)
+  }
 }
