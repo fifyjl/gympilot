@@ -112,39 +112,45 @@ function App() {
     const goalText = goalDraft.trim()
     if (!goalText) return
     setGoalBusy(true)
-    const result = await analyzeGoal(goalText)
-    updateState((current) => ({
-      ...current,
-      profile: {
-        ...current.profile,
-        goalText,
-        goals: result.keywords,
-        feedback: result.feedback,
-      },
-    }))
-    setGoalBusy(false)
+    try {
+      const result = await analyzeGoal(goalText)
+      updateState((current) => ({
+        ...current,
+        profile: {
+          ...current.profile,
+          goalText,
+          goals: result.keywords,
+          feedback: result.feedback,
+        },
+      }))
+    } finally {
+      setGoalBusy(false)
+    }
   }
 
   async function handleGeneratePlans() {
     if (state.profile.goals.length === 0 || state.selectedDates.length === 0) return
     setPlanBusy(true)
-    const result = await createPlansFromGoal({
-      goalText: state.profile.goalText,
-      keywords: state.profile.goals,
-      selectedDates: state.selectedDates,
-      diary: state.diary,
-    })
-    updateState((current) => ({
-      ...current,
-      profile: {
-        ...current.profile,
-        goals: result.keywords,
-        feedback: result.feedback,
-      },
-      plans: result.plans,
-    }))
-    setSelectedPlanId(result.plans[0]?.id || null)
-    setPlanBusy(false)
+    try {
+      const result = await createPlansFromGoal({
+        goalText: state.profile.goalText,
+        keywords: state.profile.goals,
+        selectedDates: state.selectedDates,
+        diary: state.diary,
+      })
+      updateState((current) => ({
+        ...current,
+        profile: {
+          ...current.profile,
+          goals: result.keywords,
+          feedback: result.feedback,
+        },
+        plans: result.plans,
+      }))
+      setSelectedPlanId(result.plans[0]?.id || null)
+    } finally {
+      setPlanBusy(false)
+    }
   }
 
   function toggleDate(dateValue) {
