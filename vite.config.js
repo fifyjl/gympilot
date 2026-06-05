@@ -4,7 +4,7 @@ import { fitnessApiPlugin } from './server/fitnessApi.js'
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: '/gympolit/',
+  base: '/gympilot/',
   plugins: [react(), fitnessApiPlugin()],
   server: {
     allowedHosts: ['.trycloudflare.com', '.loca.lt'],
