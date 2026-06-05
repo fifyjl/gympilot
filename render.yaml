@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: gympilot
+    runtime: static
+    buildCommand: npm ci && npm run build:cloudbase
+    staticPublishPath: ./dist
+    autoDeployTrigger: commit
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
