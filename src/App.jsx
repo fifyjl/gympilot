@@ -280,6 +280,8 @@ function App() {
           sets: exercise.defaultSets,
           reps: exercise.defaultReps,
           rest: exercise.defaultRest,
+          timed: Boolean(exercise.timed),
+          repLabel: exercise.timed ? '秒' : '次',
           weight: '',
           completedSets: 0,
         },
@@ -291,7 +293,11 @@ function App() {
     setCustomDraft((current) => ({
       ...current,
       exercises: current.exercises.map((exercise, itemIndex) =>
-        itemIndex === index ? { ...exercise, [field]: value } : exercise,
+        itemIndex === index
+          ? field === 'timed'
+            ? { ...exercise, timed: Boolean(value), repLabel: value ? '秒' : '次' }
+            : { ...exercise, [field]: value }
+          : exercise,
       ),
     }))
   }
@@ -774,8 +780,12 @@ function CustomView({ draft, mode, onAddExercise, onBegin, onDeleteWorkout, onRe
                   <span>{exercise.equipment}</span>
                   <button className="text-danger" onClick={() => onRemoveExercise(index)} type="button">删除动作</button>
                 </div>
+                <TargetModePicker
+                  timed={Boolean(exercise.timed)}
+                  onChange={(value) => onUpdateExercise(index, 'timed', value)}
+                />
                 <NumberStepper label="组数" min={1} onChange={(value) => onUpdateExercise(index, 'sets', value)} unit="组" value={Number(exercise.sets)} />
-                <NumberStepper label={exercise.timed ? '时长' : '次数'} min={1} onChange={(value) => onUpdateExercise(index, 'reps', value)} unit={exercise.repLabel || '次'} value={Number(exercise.reps)} />
+                <NumberStepper label={exercise.timed ? '目标秒数' : '目标次数'} min={1} onChange={(value) => onUpdateExercise(index, 'reps', value)} unit={exercise.repLabel || '次'} value={Number(exercise.reps)} />
                 <NumberStepper label="重量" min={0} onChange={(value) => onUpdateExercise(index, 'weight', value)} step={5} unit="kg" value={Number(exercise.weight || 0)} />
                 <NumberStepper label="休息" min={0} onChange={(value) => onUpdateExercise(index, 'rest', value)} step={5} unit="s" value={Number(exercise.rest)} />
               </div>
@@ -806,6 +816,18 @@ function CustomView({ draft, mode, onAddExercise, onBegin, onDeleteWorkout, onRe
         ))}
       </div>
     </section>
+  )
+}
+
+function TargetModePicker({ timed, onChange }) {
+  return (
+    <div className="target-mode-picker">
+      <span>目标</span>
+      <div>
+        <button className={!timed ? 'active' : ''} onClick={() => onChange(false)} type="button">次数</button>
+        <button className={timed ? 'active' : ''} onClick={() => onChange(true)} type="button">秒数</button>
+      </div>
+    </div>
   )
 }
 
