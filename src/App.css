@@ -946,7 +946,7 @@ select {
   position: relative;
   display: grid;
   gap: 6px;
-  min-height: 112px;
+  min-height: 108px;
   justify-items: start;
   border: 1px solid #dce3ec;
   border-radius: 8px;
@@ -956,18 +956,42 @@ select {
   background: #ffffff;
 }
 
-.library-grid button span {
+.library-grid button.added {
+  border-color: #1f2937;
+  background: linear-gradient(180deg, #f8fbff, #eaf2ff);
+  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.12);
+}
+
+.library-code {
   font-size: 24px;
+  line-height: 1;
 }
 
 .library-grid small {
   color: #657184;
+  line-height: 1.35;
 }
 
-.library-grid svg {
+.library-plus {
   position: absolute;
   right: 10px;
   bottom: 10px;
+}
+
+.library-added {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  border-radius: 999px;
+  padding: 4px 7px;
+  color: #ffffff;
+  background: #1f2937;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
 }
 
 .custom-list {
@@ -1473,9 +1497,56 @@ select {
   .profile-grid,
   .profile-form,
   .profile-stats,
-  .library-grid,
   .chart-card {
     grid-template-columns: 1fr;
+  }
+
+  .builder-card {
+    padding: 10px;
+  }
+
+  .library-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px;
+  }
+
+  .library-grid button {
+    min-height: 86px;
+    gap: 4px;
+    padding: 9px;
+  }
+
+  .library-code {
+    font-size: 18px;
+  }
+
+  .library-grid strong {
+    font-size: 14px;
+    line-height: 1.18;
+  }
+
+  .library-grid small {
+    display: -webkit-box;
+    overflow: hidden;
+    font-size: 11px;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .library-added {
+    right: 6px;
+    bottom: 6px;
+    padding: 4px 6px;
+    font-size: 10px;
+  }
+
+  .library-plus {
+    right: 7px;
+    bottom: 7px;
+  }
+
+  .custom-list {
+    gap: 6px;
   }
 
   .profile-hero {

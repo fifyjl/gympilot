@@ -737,6 +737,14 @@ function MiniSection({ title, items }) {
 }
 
 function CustomView({ draft, mode, onAddExercise, onBegin, onDeleteWorkout, onRemoveExercise, onSaveRequest, onStartCreate, onUpdateExercise, savedWorkouts }) {
+  const addedCounts = useMemo(() => {
+    const counts = new Map()
+    draft.exercises.forEach((exercise) => {
+      counts.set(exercise.id, (counts.get(exercise.id) || 0) + 1)
+    })
+    return counts
+  }, [draft.exercises])
+
   if (mode === 'edit') {
     return (
       <section className="screen">
@@ -746,14 +754,17 @@ function CustomView({ draft, mode, onAddExercise, onBegin, onDeleteWorkout, onRe
         </div>
         <div className="builder-card">
           <div className="library-grid">
-            {exerciseLibrary.map((exercise) => (
-              <button key={exercise.id} onClick={() => onAddExercise(exercise)} type="button">
-                <span>{exercise.image}</span>
-                <strong>{exercise.name}</strong>
-                <small>{exercise.category} · {exercise.equipment}</small>
-                <Plus size={16} />
-              </button>
-            ))}
+            {exerciseLibrary.map((exercise) => {
+              const addedCount = addedCounts.get(exercise.id) || 0
+              return (
+                <button aria-pressed={addedCount > 0} className={addedCount > 0 ? 'added' : ''} key={exercise.id} onClick={() => onAddExercise(exercise)} type="button">
+                  <span className="library-code">{exercise.image}</span>
+                  <strong>{exercise.name}</strong>
+                  <small>{exercise.category} · {exercise.equipment}</small>
+                  {addedCount > 0 ? <span className="library-added"><Check size={13} /> 已添加{addedCount > 1 ? addedCount : ''}</span> : <Plus className="library-plus" size={16} />}
+                </button>
+              )
+            })}
           </div>
           <div className="custom-list">
             {draft.exercises.map((exercise, index) => (
