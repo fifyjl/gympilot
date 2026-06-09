@@ -643,7 +643,7 @@ function TodayView({ plan, runner, watch, onBegin, onCompleteSet, onFinish, onPa
   }
 
   return (
-    <section className="screen runner-screen">
+    <section className="screen">
       <div className="section-title">
         <div>
           <p>今日训练</p>
@@ -664,7 +664,7 @@ function RunnerView({ runner, watch, onCompleteSet, onFinish, onPause, onSkip, o
     ? `${formatSeconds(runner.timerLeft)} / ${formatSeconds(runner.timerTarget)}`
     : formatSeconds(runner.timerLeft)
   return (
-    <section className="screen">
+    <section className="screen runner-screen">
       <div className="runner-card">
         <div className={isResting ? 'runner-hero rest' : 'runner-hero'}>
           <span>{isResting ? '组间休息' : '逐组教程模式'}</span>
@@ -683,16 +683,18 @@ function RunnerView({ runner, watch, onCompleteSet, onFinish, onPause, onSkip, o
           <div><span>目标</span><strong>{exercise.reps}{exercise.repLabel || '次'}</strong></div>
         </div>
         <div className="progress-line"><span style={{ width: `${progress}%` }} /></div>
-        <div className={isResting ? 'runner-controls rest-controls' : 'runner-controls'}>
-          {isResting ? (
-            <button onClick={onSkipRest} type="button"><SkipForward size={18} /> 跳过休息</button>
-          ) : (
-            <button onClick={onCompleteSet} type="button"><Check size={18} /> 完成本组</button>
-          )}
-          <button onClick={onPause} type="button">{runner.paused ? <Play size={18} /> : <Pause size={18} />} {runner.paused ? '继续' : '暂停'}</button>
-          {!isResting && <button onClick={onSkip} type="button"><SkipForward size={18} /> 跳过动作</button>}
+        <div className="runner-actions">
+          <button className="finish-button" onClick={onFinish} type="button">结束训练并保存</button>
+          <div className={isResting ? 'runner-controls rest-controls' : 'runner-controls'}>
+            {isResting ? (
+              <button onClick={onSkipRest} type="button"><SkipForward size={18} /> 跳过休息</button>
+            ) : (
+              <button onClick={onCompleteSet} type="button"><Check size={18} /> 完成本组</button>
+            )}
+            <button onClick={onPause} type="button">{runner.paused ? <Play size={18} /> : <Pause size={18} />} {runner.paused ? '继续' : '暂停'}</button>
+            {!isResting && <button onClick={onSkip} type="button"><SkipForward size={18} /> 跳过动作</button>}
+          </div>
         </div>
-        <button className="finish-button" onClick={onFinish} type="button">结束训练并保存</button>
       </div>
     </section>
   )
@@ -814,14 +816,16 @@ function CustomView({ draft, mode, onAddExercise, onBegin, onDeleteWorkout, onRe
                   <span>{exercise.equipment}</span>
                   <button className="text-danger" onClick={() => onRemoveExercise(index)} type="button">删除动作</button>
                 </div>
-                <TargetModePicker
-                  timed={Boolean(exercise.timed)}
-                  onChange={(value) => onUpdateExercise(index, 'timed', value)}
-                />
-                <NumberStepper label="组数" min={1} onChange={(value) => onUpdateExercise(index, 'sets', value)} unit="组" value={Number(exercise.sets)} />
-                <NumberStepper label={exercise.timed ? '目标秒数' : '目标次数'} min={1} onChange={(value) => onUpdateExercise(index, 'reps', value)} unit={exercise.repLabel || '次'} value={Number(exercise.reps)} />
-                <NumberStepper label="重量" min={0} onChange={(value) => onUpdateExercise(index, 'weight', value)} step={5} unit="kg" value={Number(exercise.weight || 0)} />
-                <NumberStepper label="休息" min={0} onChange={(value) => onUpdateExercise(index, 'rest', value)} step={5} unit="s" value={Number(exercise.rest)} />
+                <div className="custom-params">
+                  <TargetModePicker
+                    timed={Boolean(exercise.timed)}
+                    onChange={(value) => onUpdateExercise(index, 'timed', value)}
+                  />
+                  <NumberStepper label="组数" min={1} onChange={(value) => onUpdateExercise(index, 'sets', value)} unit="组" value={Number(exercise.sets)} />
+                  <NumberStepper label={exercise.timed ? '秒数' : '次数'} min={1} onChange={(value) => onUpdateExercise(index, 'reps', value)} unit={exercise.repLabel || '次'} value={Number(exercise.reps)} />
+                  <NumberStepper label="重量" min={0} onChange={(value) => onUpdateExercise(index, 'weight', value)} step={5} unit="kg" value={Number(exercise.weight || 0)} />
+                  <NumberStepper label="休息" min={0} onChange={(value) => onUpdateExercise(index, 'rest', value)} step={5} unit="s" value={Number(exercise.rest)} />
+                </div>
               </div>
             ))}
           </div>
@@ -893,7 +897,7 @@ function DiaryView({ diary, filterMonth, stats, onDelete, onFilterMonth, onMood 
         <div><strong>{stats.sessions}</strong><span>训练次数</span></div>
         <div><strong>{stats.totalCalories}</strong><span>卡路里</span></div>
         <div><strong>{stats.totalMinutes}</strong><span>分钟</span></div>
-        <div className="bars">{stats.bars.map((bar, index) => <span key={`${bar.label}-${index}`} style={{ height: `${Math.max(8, bar.value)}%` }} title={bar.label} />)}</div>
+        <div><strong>{stats.completed}</strong><span>完成组数</span></div>
       </div>
       <div className="card-list">
         {filtered.length === 0 && <div className="empty-card">这个月还没有训练记录。</div>}
@@ -1150,11 +1154,11 @@ function buildDiaryStats(diary, filterMonth) {
   const filtered = diary.filter((item) => monthKey(new Date(item.createdAt || item.date)) === filterMonth)
   const totalCalories = filtered.reduce((sum, item) => sum + Number(item.calories || 0), 0)
   const totalMinutes = filtered.reduce((sum, item) => sum + Number(item.duration || 0), 0)
-  const bars = Array.from({ length: 10 }, (_, index) => {
-    const slice = filtered[index]
-    return { label: slice?.date || String(index + 1), value: slice ? Math.min(100, Math.round((slice.calories || 0) / 8)) : 8 }
-  }).reverse()
-  return { sessions: filtered.length, totalCalories, totalMinutes, bars }
+  const completed = filtered.reduce(
+    (sum, item) => sum + (item.completedExercises || []).reduce((setSum, exercise) => setSum + Number(exercise.sets || 0), 0),
+    0,
+  )
+  return { sessions: filtered.length, totalCalories, totalMinutes, completed }
 }
 
 function startOfMonth(date) {

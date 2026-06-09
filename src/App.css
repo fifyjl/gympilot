@@ -746,7 +746,7 @@ select {
 }
 
 .runner-screen {
-  padding-bottom: 220px;
+  padding-bottom: 0;
 }
 
 .runner-hero {
@@ -902,6 +902,11 @@ select {
   gap: 10px;
 }
 
+.runner-actions {
+  display: grid;
+  gap: 10px;
+}
+
 .runner-controls button {
   display: inline-flex;
   align-items: center;
@@ -1038,18 +1043,22 @@ select {
 
 .custom-row {
   display: grid;
-  grid-template-columns: 1.1fr minmax(112px, 0.9fr) repeat(4, minmax(112px, 1fr));
+  grid-template-columns: minmax(150px, 0.8fr) minmax(260px, 1.2fr);
   gap: 8px;
   align-items: stretch;
   border-radius: 8px;
-  padding: 10px;
+  padding: 8px;
   background: #f7f9fc;
 }
 
 .custom-row-head {
   display: grid;
-  gap: 6px;
+  gap: 4px;
   align-content: center;
+}
+
+.custom-row-head strong {
+  line-height: 1.2;
 }
 
 .custom-row-head span {
@@ -1058,21 +1067,27 @@ select {
   font-weight: 750;
 }
 
+.custom-params {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+
 .number-stepper {
   display: grid;
-  gap: 8px;
+  gap: 6px;
   border: 1px solid #dce3ec;
   border-radius: 8px;
-  padding: 10px;
+  padding: 8px;
   background: #ffffff;
 }
 
 .target-mode-picker {
   display: grid;
-  gap: 8px;
+  gap: 6px;
   border: 1px solid #dce3ec;
   border-radius: 8px;
-  padding: 10px;
+  padding: 8px;
   background: #ffffff;
 }
 
@@ -1089,7 +1104,7 @@ select {
 }
 
 .target-mode-picker button {
-  min-height: 34px;
+  min-height: 30px;
   border-radius: 8px;
   color: #344255;
   background: #edf2f7;
@@ -1121,13 +1136,13 @@ select {
 
 .stepper-controls {
   display: grid;
-  grid-template-columns: 34px minmax(48px, 1fr) 34px;
-  gap: 6px;
+  grid-template-columns: 30px minmax(36px, 1fr) 30px;
+  gap: 4px;
 }
 
 .stepper-controls button {
   display: grid;
-  min-height: 34px;
+  min-height: 30px;
   place-items: center;
   border-radius: 8px;
   color: #17212f;
@@ -1137,19 +1152,18 @@ select {
 }
 
 .stepper-controls input {
-  min-height: 34px;
-  padding: 6px;
+  min-height: 30px;
+  padding: 4px;
   text-align: center;
 }
 
 .chart-card {
   display: grid;
-  grid-template-columns: repeat(3, 1fr) 2fr;
+  grid-template-columns: repeat(4, 1fr);
   gap: 10px;
-  align-items: end;
 }
 
-.chart-card div:not(.bars) {
+.chart-card div {
   display: grid;
   gap: 4px;
   min-height: 76px;
@@ -1166,22 +1180,6 @@ select {
   color: #657184;
   font-size: 13px;
   font-weight: 750;
-}
-
-.bars {
-  display: flex;
-  align-items: end;
-  gap: 6px;
-  height: 104px;
-  border-radius: 8px;
-  padding: 10px;
-  background: #f2f5f9;
-}
-
-.bars span {
-  flex: 1;
-  border-radius: 999px 999px 0 0;
-  background: #2563eb;
 }
 
 .segmented {
@@ -1516,7 +1514,6 @@ select {
     grid-template-columns: 1fr 1fr;
   }
 
-  .runner-controls,
   .set-panel,
   .custom-row,
   .login-actions,
@@ -1525,6 +1522,10 @@ select {
   .goal-workspace,
   .watch-strip {
     grid-template-columns: 1fr;
+  }
+
+  .custom-params {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .runner-hero {
@@ -1645,6 +1646,63 @@ select {
     gap: 6px;
   }
 
+  .custom-row {
+    grid-template-columns: 1fr;
+    padding: 8px;
+  }
+
+  .custom-row-head {
+    grid-template-columns: 1fr auto;
+    align-items: center;
+  }
+
+  .custom-row-head span {
+    grid-column: 1;
+  }
+
+  .custom-row-head .text-danger {
+    grid-row: 1 / span 2;
+    grid-column: 2;
+    align-self: center;
+  }
+
+  .custom-params {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .target-mode-picker,
+  .number-stepper {
+    padding: 6px;
+  }
+
+  .target-mode-picker > span,
+  .number-stepper span {
+    font-size: 11px;
+  }
+
+  .target-mode-picker button {
+    min-height: 28px;
+    font-size: 12px;
+  }
+
+  .number-stepper > div:first-child {
+    align-items: center;
+  }
+
+  .number-stepper strong {
+    font-size: 13px;
+  }
+
+  .stepper-controls {
+    grid-template-columns: 28px minmax(34px, 1fr) 28px;
+  }
+
+  .stepper-controls button,
+  .stepper-controls input {
+    min-height: 28px;
+  }
+
   .profile-hero {
     align-items: stretch;
     flex-direction: column;
@@ -1674,22 +1732,28 @@ select {
   }
 
   .runner-screen {
-    padding-bottom: 254px;
+    min-height: calc(100svh - 168px);
+    padding-bottom: 0;
   }
 
   .runner-card {
+    min-height: calc(100svh - 182px);
+    align-content: stretch;
+    grid-template-rows: auto auto auto auto 1fr;
     gap: 8px;
     padding: 10px;
   }
 
   .runner-hero {
-    min-height: 150px;
-    padding: 14px;
+    min-height: 132px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+    padding: 12px;
     gap: 8px;
   }
 
   .runner-hero h2 {
-    font-size: 26px;
+    font-size: 24px;
     line-height: 1.05;
   }
 
@@ -1703,9 +1767,10 @@ select {
   }
 
   .exercise-figure {
-    height: 54px;
-    padding: 0 14px;
-    font-size: 28px;
+    width: auto;
+    height: 48px;
+    padding: 0 12px;
+    font-size: 24px;
   }
 
   .watch-strip {
@@ -1753,20 +1818,9 @@ select {
   }
 
   .runner-controls {
-    position: fixed;
-    right: 10px;
-    bottom: calc(76px + env(safe-area-inset-bottom));
-    left: 10px;
-    z-index: 40;
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
     gap: 8px;
-    padding: 8px;
-    border: 1px solid rgba(214, 224, 236, 0.9);
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.96);
-    box-shadow: 0 12px 34px rgba(15, 23, 42, 0.18);
-    backdrop-filter: blur(16px);
   }
 
   .runner-controls.rest-controls {
@@ -1784,16 +1838,17 @@ select {
     height: 16px;
   }
 
+  .runner-actions {
+    align-self: end;
+    gap: 8px;
+  }
+
   .runner-card .finish-button {
-    position: fixed;
-    right: 10px;
-    bottom: calc(132px + env(safe-area-inset-bottom));
-    left: 10px;
-    z-index: 41;
-    width: auto;
-    min-height: 50px;
+    position: static;
+    width: 100%;
+    min-height: 48px;
     margin: 0;
-    box-shadow: 0 12px 34px rgba(15, 23, 42, 0.22);
+    box-shadow: none;
   }
 
   .bottom-nav button {
