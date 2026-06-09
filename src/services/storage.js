@@ -1,3 +1,5 @@
+import { saveStateToDatabase, saveUserToDatabase } from './database'
+
 const STORAGE_KEY = 'gympilot-state-v4'
 const USER_KEY = 'gympilot-current-user-v1'
 const LEGACY_KEYS = ['gympilot-state-v3', 'gympilot-state-v2']
@@ -57,6 +59,7 @@ export function loadState(userEmail = getCurrentUser()?.email) {
 
 export function saveState(state, userEmail = getCurrentUser()?.email) {
   localStorage.setItem(stateKeyForUser(userEmail), JSON.stringify(state))
+  saveStateToDatabase(userEmail, state).catch(() => {})
 }
 
 export function resetState() {
@@ -75,6 +78,7 @@ export function getCurrentUser() {
 
 export function setCurrentUser(user) {
   localStorage.setItem(USER_KEY, JSON.stringify(user))
+  saveUserToDatabase(user).catch(() => {})
 }
 
 export function clearCurrentUser() {

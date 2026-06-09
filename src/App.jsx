@@ -86,8 +86,10 @@ function App() {
     const tick = window.setInterval(() => {
       setRunner((current) => {
         if (!current || current.paused) return current
-        if (current.timerLeft + 1 < current.timerTarget) return { ...current, timerLeft: current.timerLeft + 1 }
-        return advanceRunnerSession(current, (session) => finishWorkoutRef.current?.(session))
+        if (current.timerTarget > 0 && current.timerLeft + 1 >= current.timerTarget) {
+          return { ...current, timerLeft: current.timerTarget }
+        }
+        return { ...current, timerLeft: current.timerLeft + 1 }
       })
     }, 1000)
     return () => window.clearInterval(tick)
@@ -203,6 +205,10 @@ function App() {
 
   function completeCurrentSet() {
     setRunner((current) => (current ? markSetCompleteSession(current, false, finishWorkout) : current))
+  }
+
+  function skipRest() {
+    setRunner((current) => (current ? moveAfterRestSession(current, finishWorkout) : current))
   }
 
   function skipExercise() {
@@ -410,6 +416,7 @@ function App() {
           onFinish={() => finishWorkout()}
           onPause={() => setRunner((current) => current ? { ...current, paused: !current.paused } : current)}
           onSkip={skipExercise}
+          onSkipRest={skipRest}
         />
       )}
 
@@ -620,7 +627,7 @@ function MonthCalendar({ month, onMonthChange, onToggleDate, plans, selectedDate
   )
 }
 
-function TodayView({ plan, runner, watch, onBegin, onCompleteSet, onFinish, onPause, onSkip }) {
+function TodayView({ plan, runner, watch, onBegin, onCompleteSet, onFinish, onPause, onSkip, onSkipRest }) {
   if (runner) {
     return (
       <RunnerView
@@ -629,6 +636,7 @@ function TodayView({ plan, runner, watch, onBegin, onCompleteSet, onFinish, onPa
         onCompleteSet={onCompleteSet}
         onFinish={onFinish}
         onPause={onPause}
+        onSkipRest={onSkipRest}
         onSkip={onSkip}
       />
     )
@@ -648,21 +656,24 @@ function TodayView({ plan, runner, watch, onBegin, onCompleteSet, onFinish, onPa
   )
 }
 
-function RunnerView({ runner, watch, onCompleteSet, onFinish, onPause, onSkip }) {
+function RunnerView({ runner, watch, onCompleteSet, onFinish, onPause, onSkip, onSkipRest }) {
   const exercise = runner.workout.strength[runner.exerciseIndex]
   const progress = Math.round((runner.completed.length / totalSets(runner.workout.strength)) * 100)
   const isResting = runner.phase === 'rest'
+  const timerText = runner.timerTarget > 0
+    ? `${formatSeconds(runner.timerLeft)} / ${formatSeconds(runner.timerTarget)}`
+    : formatSeconds(runner.timerLeft)
   return (
     <section className="screen">
       <div className="runner-card">
         <div className={isResting ? 'runner-hero rest' : 'runner-hero'}>
           <span>{isResting ? '组间休息' : '逐组教程模式'}</span>
           <h2>{isResting ? '准备下一组' : exercise.name}</h2>
-          <p>{isResting ? '休息结束后会自动进入下一组。调整呼吸，补水，保持动作质量。' : exercise.illustration}</p>
+          <p>{isResting ? '休息结束后按“跳过休息”进入下一组。调整呼吸，补水，保持动作质量。' : exercise.illustration}</p>
           <div className="exercise-figure">{isResting ? 'REST' : exercise.image}</div>
         </div>
         <div className="watch-strip">
-          <span><Timer size={16} /> {isResting ? '已休息' : '已训练'} {formatSeconds(runner.timerLeft)} / {formatSeconds(runner.timerTarget)}</span>
+          <span><Timer size={16} /> {isResting ? '已休息' : '已训练'} {timerText}</span>
           <span><HeartPulse size={16} /> {watch.latest?.heartRate || '--'} bpm</span>
           <span><Flame size={16} /> {watch.latest?.calories || '--'} kcal</span>
         </div>
@@ -672,10 +683,14 @@ function RunnerView({ runner, watch, onCompleteSet, onFinish, onPause, onSkip })
           <div><span>目标</span><strong>{exercise.reps}{exercise.repLabel || '次'}</strong></div>
         </div>
         <div className="progress-line"><span style={{ width: `${progress}%` }} /></div>
-        <div className="runner-controls">
-          <button onClick={onCompleteSet} type="button"><Check size={18} /> 完成本组</button>
+        <div className={isResting ? 'runner-controls rest-controls' : 'runner-controls'}>
+          {isResting ? (
+            <button onClick={onSkipRest} type="button"><SkipForward size={18} /> 跳过休息</button>
+          ) : (
+            <button onClick={onCompleteSet} type="button"><Check size={18} /> 完成本组</button>
+          )}
           <button onClick={onPause} type="button">{runner.paused ? <Play size={18} /> : <Pause size={18} />} {runner.paused ? '继续' : '暂停'}</button>
-          <button onClick={onSkip} type="button"><SkipForward size={18} /> 跳过</button>
+          {!isResting && <button onClick={onSkip} type="button"><SkipForward size={18} /> 跳过动作</button>}
         </div>
         <button className="finish-button" onClick={onFinish} type="button">结束训练并保存</button>
       </div>
@@ -1047,7 +1062,7 @@ function ProfileView({ diary, onLogout, onProfileChange, onSyncWatch, plans, pro
 }
 
 function setDuration(exercise) {
-  return exercise.timed ? Number(exercise.reps) : 30
+  return exercise.timed ? Number(exercise.reps) : 0
 }
 
 function timerFields(session, target) {
@@ -1055,12 +1070,6 @@ function timerFields(session, target) {
     timerTarget: target,
     timerLeft: 0,
   }
-}
-
-function advanceRunnerSession(session, finishWorkout) {
-  return session.phase === 'work'
-    ? markSetCompleteSession(session, true, finishWorkout)
-    : moveAfterRestSession(session, finishWorkout)
 }
 
 function markSetCompleteSession(session, fromTimer, finishWorkout) {

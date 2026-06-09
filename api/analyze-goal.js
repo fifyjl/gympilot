@@ -1,3 +1,5 @@
+/* global process */
+
 import { analyzeWithProvider, hasAiProvider } from '../server/aiProvider.js'
 
 export default async function handler(req, res) {
