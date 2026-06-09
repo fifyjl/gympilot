@@ -765,7 +765,7 @@ function CustomView({ draft, mode, onAddExercise, onBegin, onDeleteWorkout, onRe
   }, [draft.exercises])
   const filteredExercises = useMemo(
     () => selectedCategory === 'all'
-      ? exerciseLibrary
+      ? collapseCustomExercises(exerciseLibrary)
       : exerciseLibrary.filter((exercise) => exercise.muscle === selectedCategory),
     [selectedCategory],
   )
@@ -804,7 +804,7 @@ function CustomView({ draft, mode, onAddExercise, onBegin, onDeleteWorkout, onRe
                 >
                   <span className="library-code">{exercise.image}</span>
                   <strong>{exercise.name}</strong>
-                  <small>{exercise.category} · {exercise.equipment}</small>
+                  {!custom && <small>{exercise.category} · {exercise.equipment}</small>}
                   {addedCount > 0 ? <span className="library-added"><Check size={13} /> 已添加{addedCount > 1 ? addedCount : ''}</span> : <Plus className="library-plus" size={16} />}
                 </button>
               )
@@ -814,8 +814,23 @@ function CustomView({ draft, mode, onAddExercise, onBegin, onDeleteWorkout, onRe
             {draft.exercises.map((exercise, index) => (
               <div className="custom-row" key={`${exercise.id}-${index}`}>
                 <div className="custom-row-head">
-                  <strong>{exercise.name}</strong>
-                  <span>{exercise.equipment}</span>
+                  {isCustomExercise(exercise) ? (
+                    <div className="custom-fields">
+                      <label>
+                        动作名称
+                        <input value={exercise.name} onChange={(event) => onUpdateExercise(index, 'name', event.target.value)} placeholder="例如：我的练背动作" />
+                      </label>
+                      <label>
+                        动作描述
+                        <textarea value={exercise.illustration || ''} onChange={(event) => onUpdateExercise(index, 'illustration', event.target.value)} placeholder="记录动作要点、器械、发力感觉等" />
+                      </label>
+                    </div>
+                  ) : (
+                    <>
+                      <strong>{exercise.name}</strong>
+                      <span>{exercise.equipment}</span>
+                    </>
+                  )}
                   <button className="text-danger" onClick={() => onRemoveExercise(index)} type="button">删除动作</button>
                 </div>
                 <div className="custom-params">
@@ -861,6 +876,16 @@ function CustomView({ draft, mode, onAddExercise, onBegin, onDeleteWorkout, onRe
 
 function isCustomExercise(exercise) {
   return String(exercise.id || '').startsWith('custom-')
+}
+
+function collapseCustomExercises(exercises) {
+  let customSeen = false
+  return exercises.filter((exercise) => {
+    if (!isCustomExercise(exercise)) return true
+    if (customSeen) return false
+    customSeen = true
+    return true
+  })
 }
 
 function runnerHeroBackground(exercise, isResting) {

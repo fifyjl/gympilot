@@ -1047,6 +1047,34 @@ select {
   font-weight: 750;
 }
 
+.custom-fields {
+  display: grid;
+  gap: 6px;
+}
+
+.custom-fields label {
+  display: grid;
+  gap: 4px;
+  color: #657184;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.custom-fields input,
+.custom-fields textarea {
+  min-height: 34px;
+  border-radius: 8px;
+  padding: 7px 8px;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.custom-fields textarea {
+  min-height: 54px;
+  line-height: 1.35;
+  resize: vertical;
+}
+
 .custom-params {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -1640,10 +1668,14 @@ select {
 
   .custom-row-head {
     grid-template-columns: 1fr auto;
-    align-items: center;
+    align-items: start;
   }
 
   .custom-row-head span {
+    grid-column: 1;
+  }
+
+  .custom-fields {
     grid-column: 1;
   }
 
