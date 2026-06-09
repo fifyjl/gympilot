@@ -86,9 +86,6 @@ function App() {
     const tick = window.setInterval(() => {
       setRunner((current) => {
         if (!current || current.paused) return current
-        if (current.timerTarget > 0 && current.timerLeft + 1 >= current.timerTarget) {
-          return { ...current, timerLeft: current.timerTarget }
-        }
         return { ...current, timerLeft: current.timerLeft + 1 }
       })
     }, 1000)
@@ -666,11 +663,9 @@ function RunnerView({ runner, watch, onCompleteSet, onFinish, onPause, onSkip, o
   return (
     <section className="screen runner-screen">
       <div className="runner-card">
-        <div className={isResting ? 'runner-hero rest' : 'runner-hero'}>
-          <span>{isResting ? '组间休息' : '逐组教程模式'}</span>
+        <div className={isResting ? 'runner-hero rest' : 'runner-hero'} style={{ backgroundImage: runnerHeroBackground(exercise, isResting) }}>
           <h2>{isResting ? '准备下一组' : exercise.name}</h2>
           <p>{isResting ? '休息结束后按“跳过休息”进入下一组。调整呼吸，补水，保持动作质量。' : exercise.illustration}</p>
-          <div className="exercise-figure">{isResting ? 'REST' : exercise.image}</div>
         </div>
         <div className="watch-strip">
           <span><Timer size={16} /> {isResting ? '已休息' : '已训练'} {timerText}</span>
@@ -777,10 +772,10 @@ function CustomView({ draft, mode, onAddExercise, onBegin, onDeleteWorkout, onRe
 
   if (mode === 'edit') {
     return (
-      <section className="screen">
+      <section className="screen custom-editor-screen">
         <div className="section-title">
           <div><p>自定义编辑</p><h2>选择动作并设置参数</h2></div>
-          <button className="primary-button" onClick={onSaveRequest} type="button"><Save size={18} /> 保存计划</button>
+          <button className="primary-button custom-save-button" onClick={onSaveRequest} type="button"><Save size={18} /> 保存计划</button>
         </div>
         <div className="builder-card">
           <div className="exercise-tabs" aria-label="动作分类">
@@ -798,8 +793,15 @@ function CustomView({ draft, mode, onAddExercise, onBegin, onDeleteWorkout, onRe
           <div className="library-grid">
             {filteredExercises.map((exercise) => {
               const addedCount = addedCounts.get(exercise.id) || 0
+              const custom = isCustomExercise(exercise)
               return (
-                <button aria-pressed={addedCount > 0} className={addedCount > 0 ? 'added' : ''} key={exercise.id} onClick={() => onAddExercise(exercise)} type="button">
+                <button
+                  aria-pressed={addedCount > 0}
+                  className={`${addedCount > 0 ? 'added' : ''} ${custom ? 'custom-library-card' : ''}`}
+                  key={exercise.id}
+                  onClick={() => onAddExercise(exercise)}
+                  type="button"
+                >
                   <span className="library-code">{exercise.image}</span>
                   <strong>{exercise.name}</strong>
                   <small>{exercise.category} · {exercise.equipment}</small>
@@ -855,6 +857,43 @@ function CustomView({ draft, mode, onAddExercise, onBegin, onDeleteWorkout, onRe
       </div>
     </section>
   )
+}
+
+function isCustomExercise(exercise) {
+  return String(exercise.id || '').startsWith('custom-')
+}
+
+function runnerHeroBackground(exercise, isResting) {
+  const image = isResting
+    ? 'https://images.unsplash.com/photo-1599058917765-a780eda07a3e?auto=format&fit=crop&w=1200&q=80'
+    : exercise.imageUrl || imageForExercise(exercise)
+  const overlay = isResting
+    ? 'linear-gradient(135deg, rgba(5, 46, 39, 0.88), rgba(13, 148, 136, 0.66))'
+    : 'linear-gradient(135deg, rgba(2, 6, 23, 0.82), rgba(15, 23, 42, 0.36))'
+  return `${overlay}, url('${image}')`
+}
+
+function imageForExercise(exercise) {
+  const equipment = `${exercise.equipment || ''}${exercise.name || ''}`
+  if (/哈克|腿举|侧蹬|深蹲|腿屈伸|腿弯|髋外展|髋内收|臀推|提踵/.test(equipment)) {
+    return 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=1200&q=80'
+  }
+  if (/推胸|卧推|蝴蝶|夹胸|双杠|俯卧撑/.test(equipment)) {
+    return 'https://images.unsplash.com/photo-1580674684081-7617fbf3d745?auto=format&fit=crop&w=1200&q=80'
+  }
+  if (/下拉|划船|引体|T杠|背|面拉|直臂/.test(equipment)) {
+    return 'https://images.unsplash.com/photo-1605296867304-46d5465a13f1?auto=format&fit=crop&w=1200&q=80'
+  }
+  if (/肩推|侧平举|飞鸟|耸肩|直立划船/.test(equipment)) {
+    return 'https://images.unsplash.com/photo-1532029837206-abbe2b7620e3?auto=format&fit=crop&w=1200&q=80'
+  }
+  if (/弯举|下压|臂屈伸|手臂|牧师/.test(equipment)) {
+    return 'https://images.unsplash.com/photo-1588345921523-c2dcdb7f1dcd?auto=format&fit=crop&w=1200&q=80'
+  }
+  if (/卷腹|核心|平板|举腿|瑜伽垫|罗马椅/.test(equipment)) {
+    return 'https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&w=1200&q=80'
+  }
+  return 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&w=1200&q=80'
 }
 
 function TargetModePicker({ timed, onChange }) {
