@@ -160,8 +160,8 @@ function chooseFocus(blueprint, index, diary, picked) {
 function buildStrength(blueprint, goals, focus, dayIndex) {
   const pool = pickByIds(exerciseLibrary, blueprint.exerciseIds)
   const focusFirst = [
-    ...pool.filter((exercise) => exercise.muscle === focus),
-    ...pool.filter((exercise) => exercise.muscle !== focus),
+    ...pool.filter((exercise) => matchesFocus(exercise.muscle, focus)),
+    ...pool.filter((exercise) => !matchesFocus(exercise.muscle, focus)),
   ]
   const count = /增肌|力量|翘臀/.test(goals.join(' ')) ? 4 : 5
 
@@ -182,6 +182,14 @@ function buildStrength(blueprint, goals, focus, dayIndex) {
       completedSets: 0,
     }
   })
+}
+
+function matchesFocus(muscle, focus) {
+  const aliases = {
+    push: ['chest', 'shoulders'],
+    pull: ['back'],
+  }
+  return muscle === focus || aliases[focus]?.includes(muscle)
 }
 
 function pickByIds(list, ids) {

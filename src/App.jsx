@@ -26,7 +26,7 @@ import {
   Trash2,
   Watch,
 } from 'lucide-react'
-import { exerciseLibrary } from './data/exercises'
+import { exerciseCategories, exerciseLibrary } from './data/exercises'
 import { connectAppleWatch, readLatestWorkoutMetrics } from './services/appleWatch'
 import { requestEmailCode, verifyEmailCode } from './services/auth'
 import { analyzeGoal, createPlansFromGoal } from './services/goalEngine'
@@ -643,7 +643,7 @@ function TodayView({ plan, runner, watch, onBegin, onCompleteSet, onFinish, onPa
   }
 
   return (
-    <section className="screen">
+    <section className="screen runner-screen">
       <div className="section-title">
         <div>
           <p>今日训练</p>
@@ -758,6 +758,7 @@ function MiniSection({ title, items }) {
 }
 
 function CustomView({ draft, mode, onAddExercise, onBegin, onDeleteWorkout, onRemoveExercise, onSaveRequest, onStartCreate, onUpdateExercise, savedWorkouts }) {
+  const [selectedCategory, setSelectedCategory] = useState('all')
   const addedCounts = useMemo(() => {
     const counts = new Map()
     draft.exercises.forEach((exercise) => {
@@ -765,6 +766,12 @@ function CustomView({ draft, mode, onAddExercise, onBegin, onDeleteWorkout, onRe
     })
     return counts
   }, [draft.exercises])
+  const filteredExercises = useMemo(
+    () => selectedCategory === 'all'
+      ? exerciseLibrary
+      : exerciseLibrary.filter((exercise) => exercise.muscle === selectedCategory),
+    [selectedCategory],
+  )
 
   if (mode === 'edit') {
     return (
@@ -774,8 +781,20 @@ function CustomView({ draft, mode, onAddExercise, onBegin, onDeleteWorkout, onRe
           <button className="primary-button" onClick={onSaveRequest} type="button"><Save size={18} /> 保存计划</button>
         </div>
         <div className="builder-card">
+          <div className="exercise-tabs" aria-label="动作分类">
+            {exerciseCategories.map((category) => (
+              <button
+                className={selectedCategory === category.id ? 'active' : ''}
+                key={category.id}
+                onClick={() => setSelectedCategory(category.id)}
+                type="button"
+              >
+                {category.label}
+              </button>
+            ))}
+          </div>
           <div className="library-grid">
-            {exerciseLibrary.map((exercise) => {
+            {filteredExercises.map((exercise) => {
               const addedCount = addedCounts.get(exercise.id) || 0
               return (
                 <button aria-pressed={addedCount > 0} className={addedCount > 0 ? 'added' : ''} key={exercise.id} onClick={() => onAddExercise(exercise)} type="button">

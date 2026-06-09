@@ -745,6 +745,10 @@ select {
   box-shadow: 0 22px 46px rgba(15, 23, 42, 0.14);
 }
 
+.runner-screen {
+  padding-bottom: 220px;
+}
+
 .runner-hero {
   position: relative;
   display: grid;
@@ -761,6 +765,10 @@ select {
     url('https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&w=1200&q=80');
   background-position: center;
   background-size: cover;
+}
+
+.runner-card .finish-button {
+  margin-top: -4px;
 }
 
 .runner-hero::before {
@@ -926,6 +934,35 @@ select {
 .watch-card {
   display: grid;
   gap: 12px;
+}
+
+.exercise-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 2px 2px 8px;
+  scrollbar-width: none;
+}
+
+.exercise-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.exercise-tabs button {
+  flex: 0 0 auto;
+  min-height: 36px;
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: #344255;
+  background: #edf2f7;
+  font-size: 13px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.exercise-tabs button.active {
+  color: #ffffff;
+  background: #1f2937;
 }
 
 .builder-card label,
@@ -1511,7 +1548,21 @@ select {
 
 @media (max-width: 520px) {
   .app {
-    padding-inline: 10px;
+    min-height: 100svh;
+    padding: 8px 10px 86px;
+  }
+
+  .screen {
+    gap: 10px;
+  }
+
+  .topbar {
+    margin-bottom: 8px;
+    padding: 7px 0;
+  }
+
+  .topbar strong {
+    font-size: 21px;
   }
 
   .topbar span {
@@ -1538,6 +1589,16 @@ select {
 
   .builder-card {
     padding: 10px;
+  }
+
+  .exercise-tabs {
+    position: sticky;
+    top: 58px;
+    z-index: 4;
+    margin: -2px -2px 0;
+    padding: 2px 2px 8px;
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(10px);
   }
 
   .library-grid {
@@ -1612,13 +1673,127 @@ select {
     flex-direction: column;
   }
 
+  .runner-screen {
+    padding-bottom: 254px;
+  }
+
+  .runner-card {
+    gap: 8px;
+    padding: 10px;
+  }
+
   .runner-hero {
-    min-height: 238px;
-    padding: 20px;
+    min-height: 150px;
+    padding: 14px;
+    gap: 8px;
   }
 
   .runner-hero h2 {
-    font-size: 32px;
+    font-size: 26px;
+    line-height: 1.05;
+  }
+
+  .runner-hero p {
+    display: -webkit-box;
+    overflow: hidden;
+    font-size: 14px;
+    line-height: 1.45;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .exercise-figure {
+    height: 54px;
+    padding: 0 14px;
+    font-size: 28px;
+  }
+
+  .watch-strip {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .watch-strip span {
+    min-height: 42px;
+    gap: 4px;
+    padding: 6px 4px;
+    font-size: 12px;
+    line-height: 1.15;
+  }
+
+  .watch-strip svg {
+    width: 14px;
+    height: 14px;
+    flex: 0 0 auto;
+  }
+
+  .set-panel {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .set-panel div {
+    min-height: 62px;
+    gap: 4px;
+    padding: 9px 8px;
+  }
+
+  .set-panel span {
+    font-size: 11px;
+  }
+
+  .set-panel strong {
+    font-size: 14px;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+  }
+
+  .progress-line {
+    height: 8px;
+  }
+
+  .runner-controls {
+    position: fixed;
+    right: 10px;
+    bottom: calc(76px + env(safe-area-inset-bottom));
+    left: 10px;
+    z-index: 40;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+    padding: 8px;
+    border: 1px solid rgba(214, 224, 236, 0.9);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 12px 34px rgba(15, 23, 42, 0.18);
+    backdrop-filter: blur(16px);
+  }
+
+  .runner-controls.rest-controls {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .runner-controls button {
+    min-height: 48px;
+    padding: 8px 6px;
+    font-size: 14px;
+  }
+
+  .runner-controls svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .runner-card .finish-button {
+    position: fixed;
+    right: 10px;
+    bottom: calc(132px + env(safe-area-inset-bottom));
+    left: 10px;
+    z-index: 41;
+    width: auto;
+    min-height: 50px;
+    margin: 0;
+    box-shadow: 0 12px 34px rgba(15, 23, 42, 0.22);
   }
 
   .bottom-nav button {

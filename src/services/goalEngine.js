@@ -145,9 +145,9 @@ function chooseStrength(focus, keywords, index, profile, context) {
   const text = keywords.join(' ')
   const preferred = exerciseLibrary.filter((exercise) => {
     if (focus === 'cardio') return exercise.muscle === 'cardio' || exercise.timed
-    return exercise.muscle === focus
+    return matchesFocus(exercise.muscle, focus)
   })
-  const fallback = exerciseLibrary.filter((exercise) => exercise.muscle !== focus)
+  const fallback = exerciseLibrary.filter((exercise) => !matchesFocus(exercise.muscle, focus))
   const pool = [...preferred, ...fallback].slice(0, text.includes('减脂') || text.includes('瘦腹') ? 5 : 4)
   return pool.map((exercise, exerciseIndex) => {
     const heavy = text.includes('力量') || text.includes('增肌')
@@ -165,6 +165,14 @@ function chooseStrength(focus, keywords, index, profile, context) {
       completedSets: 0,
     }
   })
+}
+
+function matchesFocus(muscle, focus) {
+  const aliases = {
+    push: ['chest', 'shoulders'],
+    pull: ['back'],
+  }
+  return muscle === focus || aliases[focus]?.includes(muscle)
 }
 
 function chooseCardio(focus, keywords, profile, context) {
